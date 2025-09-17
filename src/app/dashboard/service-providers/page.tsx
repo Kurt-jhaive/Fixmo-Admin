@@ -1,8 +1,41 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { adminApi, testBackendConnection, ServiceProvider } from '@/lib/api';
-import { getImageUrl, handleImageError, getPlaceholderImage, shouldUseNextImage } from '@/lib/image-utils';
+import { adminApi, ServiceProvider } from '@/lib/api';
+import { getImageUrl, handleImageError, getPlaceholderImage } from '@/lib/image-utils';
+import type { ReasonsData } from "@/types/reasons";
+
+// Import reasons data directly
+const reasonsData: ReasonsData = {
+  "verificationRejection": [
+    "Uploaded ID is blurry or unreadable",
+    "Name on ID does not match account name",
+    "Expired or invalid government ID",
+    "Incomplete or inconsistent profile details",
+    "Location/address cannot be verified",
+    "Suspected fake or tampered ID",
+    "Duplicate or multiple accounts using the same ID",
+    "Suspicious or fraudulent activity detected"
+  ],
+  "certificateRejection": [
+    "Certificate is expired",
+    "Certificate image is unclear or low quality",
+    "Certificate does not match the claimed service category",
+    "Issuing authority not recognized or not accredited",
+    "Certificate appears forged or altered",
+    "Missing critical details (e.g., name, date, signature)",
+    "Credentials are insufficient to allow service creation"
+  ],
+  "deactivationReasons": [
+    "Multiple unresolved complaints from other users",
+    "Repeated violation of platform policies",
+    "Fraudulent or suspicious transactions",
+    "Harassment or abusive behavior",
+    "Consistently poor service ratings or feedback",
+    "Failure to fulfill confirmed appointments",
+    "Providing false or misleading information during verification"
+  ]
+};
 
 export default function ServiceProvidersPage() {
   const [providers, setProviders] = useState<ServiceProvider[]>([]);
@@ -12,6 +45,15 @@ export default function ServiceProvidersPage() {
   const [selectedProvider, setSelectedProvider] = useState<ServiceProvider | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [backendStatus, setBackendStatus] = useState<'unknown' | 'connected' | 'disconnected'>('unknown');
+  
+  // Rejection/Deactivation Modal States
+  const [showRejectModal, setShowRejectModal] = useState(false);
+  const [showDeactivateModal, setShowDeactivateModal] = useState(false);
+  const [actionProvider, setActionProvider] = useState<ServiceProvider | null>(null);
+  const [rejectionReason, setRejectionReason] = useState("");
+  const [deactivationReason, setDeactivationReason] = useState("");
+  const [customReason, setCustomReason] = useState("");
+  const [showCustomReason, setShowCustomReason] = useState(false);
 
   useEffect(() => {
     fetchProviders();
@@ -79,19 +121,81 @@ export default function ServiceProvidersPage() {
     }
   };
 
-  const handleVerifyProvider = async (providerId: string, verified: boolean) => {
+  const handleVerifyProvider = async (providerId: string) => {
     try {
-      await adminApi.verifyProvider(providerId, verified);
+      await adminApi.verifyProvider(providerId, true);
       await fetchProviders(); // Refresh the list
     } catch (error) {
       console.error('Error verifying provider:', error);
     }
   };
 
+  const handleRejectProvider = (provider: ServiceProvider) => {
+    setActionProvider(provider);
+    setRejectionReason("");
+    setCustomReason("");
+    setShowCustomReason(false);
+    setShowRejectModal(true);
+  };
+
+  const handleDeactivateProvider = (provider: ServiceProvider) => {
+    setActionProvider(provider);
+    setDeactivationReason("");
+    setCustomReason("");
+    setShowCustomReason(false);
+    setShowDeactivateModal(true);
+  };
+
+  const confirmRejectProvider = async () => {
+    if (!actionProvider) return;
+    
+    const finalReason = showCustomReason ? customReason : rejectionReason;
+    if (!finalReason.trim()) {
+      alert("Please select or enter a rejection reason");
+      return;
+    }
+
+    try {
+      await adminApi.rejectProvider(actionProvider.provider_id.toString(), finalReason);
+      setShowRejectModal(false);
+      setActionProvider(null);
+      await fetchProviders(); // Refresh the list
+    } catch (error) {
+      console.error('Error rejecting provider:', error);
+    }
+  };
+
+  const confirmDeactivateProvider = async () => {
+    if (!actionProvider) return;
+    
+    const finalReason = showCustomReason ? customReason : deactivationReason;
+    if (!finalReason.trim()) {
+      alert("Please select or enter a deactivation reason");
+      return;
+    }
+
+    try {
+      await adminApi.deactivateProvider(actionProvider.provider_id, finalReason);
+      setShowDeactivateModal(false);
+      setActionProvider(null);
+      await fetchProviders(); // Refresh the list
+    } catch (error) {
+      console.error('Error deactivating provider:', error);
+    }
+  };
+
   const handleStatusChange = async (providerId: string, status: 'active' | 'inactive') => {
     try {
-      await adminApi.updateProviderStatus(providerId, status);
-      await fetchProviders(); // Refresh the list
+      if (status === 'active') {
+        await adminApi.updateProviderStatus(providerId, status);
+        await fetchProviders(); // Refresh the list
+      } else {
+        // For deactivation, show modal to get reason
+        const provider = providers.find(p => p.provider_id.toString() === providerId);
+        if (provider) {
+          handleDeactivateProvider(provider);
+        }
+      }
     } catch (error) {
       console.error('Error updating provider status:', error);
     }
@@ -164,7 +268,7 @@ export default function ServiceProvidersPage() {
           <div>
             <select
               value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value as any)}
+              onChange={(e) => setFilterStatus(e.target.value as 'all' | 'verified' | 'pending' | 'rejected')}
               className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="all">All Status</option>
@@ -269,21 +373,27 @@ export default function ServiceProvidersPage() {
                       View
                     </button>
                     {!provider.provider_isVerified && (
-                      <button
-                        onClick={() => handleVerifyProvider(provider.provider_id.toString(), true)}
-                        className="text-green-600 hover:text-green-900"
-                      >
-                        Verify
-                      </button>
+                      <>
+                        <button
+                          onClick={() => handleVerifyProvider(provider.provider_id.toString())}
+                          className="text-green-600 hover:text-green-900"
+                        >
+                          Verify
+                        </button>
+                        <button
+                          onClick={() => handleRejectProvider(provider)}
+                          className="text-red-600 hover:text-red-900"
+                        >
+                          Reject
+                        </button>
+                      </>
                     )}
-                    {provider.provider_isVerified && (
-                      <button
-                        onClick={() => handleVerifyProvider(provider.provider_id.toString(), false)}
-                        className="text-red-600 hover:text-red-900"
-                      >
-                        Revoke
-                      </button>
-                    )}
+                    <button
+                      onClick={() => handleStatusChange(provider.provider_id.toString(), provider.provider_isActivated ? 'inactive' : 'active')}
+                      className={provider.provider_isActivated ? "text-red-600 hover:text-red-900" : "text-green-600 hover:text-green-900"}
+                    >
+                      {provider.provider_isActivated ? 'Deactivate' : 'Activate'}
+                    </button>
                   </td>
                 </tr>
                 );
@@ -400,7 +510,7 @@ export default function ServiceProvidersPage() {
                       {!selectedProvider.provider_isVerified ? (
                         <button
                           onClick={() => {
-                            handleVerifyProvider(selectedProvider.provider_id.toString(), true);
+                            handleVerifyProvider(selectedProvider.provider_id.toString());
                             setShowModal(false);
                           }}
                           className="w-full bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700"
@@ -410,7 +520,7 @@ export default function ServiceProvidersPage() {
                       ) : (
                         <button
                           onClick={() => {
-                            handleVerifyProvider(selectedProvider.provider_id.toString(), false);
+                            handleRejectProvider(selectedProvider);
                             setShowModal(false);
                           }}
                           className="w-full bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700"
@@ -457,6 +567,170 @@ export default function ServiceProvidersPage() {
                 : 'No service providers have been registered yet.'
               }
             </p>
+          </div>
+        </div>
+      )}
+
+      {/* Provider Rejection Modal */}
+      {showRejectModal && actionProvider && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-20 mx-auto p-5 border w-11/12 md:w-1/2 lg:w-1/3 shadow-lg rounded-md bg-white">
+            <div className="mt-3">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-medium text-gray-900">Reject Provider Verification</h3>
+                <button
+                  onClick={() => setShowRejectModal(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  ✕
+                </button>
+              </div>
+              
+              <div className="space-y-4">
+                <p className="text-sm text-gray-600">
+                  You are rejecting the verification for: <strong>{actionProvider.provider_first_name} {actionProvider.provider_last_name}</strong>
+                </p>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Rejection Reason
+                  </label>
+                  <select
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    value={showCustomReason ? "custom" : rejectionReason}
+                    onChange={(e) => {
+                      if (e.target.value === "custom") {
+                        setShowCustomReason(true);
+                        setRejectionReason("");
+                      } else {
+                        setShowCustomReason(false);
+                        setRejectionReason(e.target.value);
+                      }
+                    }}
+                  >
+                    <option value="">Select a reason...</option>
+                    {reasonsData.verificationRejection.map((reason: string, index: number) => (
+                      <option key={index} value={reason}>
+                        {reason}
+                      </option>
+                    ))}
+                    <option value="custom">Other (specify custom reason)</option>
+                  </select>
+                </div>
+
+                {showCustomReason && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Custom Rejection Reason
+                    </label>
+                    <textarea
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      rows={3}
+                      placeholder="Enter custom rejection reason..."
+                      value={customReason}
+                      onChange={(e) => setCustomReason(e.target.value)}
+                    />
+                  </div>
+                )}
+
+                <div className="flex justify-end space-x-3 pt-4">
+                  <button
+                    onClick={() => setShowRejectModal(false)}
+                    className="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={confirmRejectProvider}
+                    className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500"
+                  >
+                    Reject Provider
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Provider Deactivation Modal */}
+      {showDeactivateModal && actionProvider && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-20 mx-auto p-5 border w-11/12 md:w-1/2 lg:w-1/3 shadow-lg rounded-md bg-white">
+            <div className="mt-3">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-medium text-gray-900">Deactivate Service Provider</h3>
+                <button
+                  onClick={() => setShowDeactivateModal(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  ✕
+                </button>
+              </div>
+              
+              <div className="space-y-4">
+                <p className="text-sm text-gray-600">
+                  You are deactivating: <strong>{actionProvider.provider_first_name} {actionProvider.provider_last_name}</strong>
+                </p>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Deactivation Reason
+                  </label>
+                  <select
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    value={showCustomReason ? "custom" : deactivationReason}
+                    onChange={(e) => {
+                      if (e.target.value === "custom") {
+                        setShowCustomReason(true);
+                        setDeactivationReason("");
+                      } else {
+                        setShowCustomReason(false);
+                        setDeactivationReason(e.target.value);
+                      }
+                    }}
+                  >
+                    <option value="">Select a reason...</option>
+                    {reasonsData.deactivationReasons.map((reason: string, index: number) => (
+                      <option key={index} value={reason}>
+                        {reason}
+                      </option>
+                    ))}
+                    <option value="custom">Other (specify custom reason)</option>
+                  </select>
+                </div>
+
+                {showCustomReason && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Custom Deactivation Reason
+                    </label>
+                    <textarea
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      rows={3}
+                      placeholder="Enter custom deactivation reason..."
+                      value={customReason}
+                      onChange={(e) => setCustomReason(e.target.value)}
+                    />
+                  </div>
+                )}
+
+                <div className="flex justify-end space-x-3 pt-4">
+                  <button
+                    onClick={() => setShowDeactivateModal(false)}
+                    className="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={confirmDeactivateProvider}
+                    className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500"
+                  >
+                    Deactivate Provider
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}

@@ -2,7 +2,40 @@
 
 import { useState, useEffect } from "react";
 import { adminApi, type Certificate } from "@/lib/api";
-import { getImageUrl, isValidImageUrl } from "@/lib/image-utils";
+import { getImageUrl } from "@/lib/image-utils";
+import type { ReasonsData } from "@/types/reasons";
+
+// Import reasons data directly
+const reasonsData: ReasonsData = {
+  "verificationRejection": [
+    "Uploaded ID is blurry or unreadable",
+    "Name on ID does not match account name",
+    "Expired or invalid government ID",
+    "Incomplete or inconsistent profile details",
+    "Location/address cannot be verified",
+    "Suspected fake or tampered ID",
+    "Duplicate or multiple accounts using the same ID",
+    "Suspicious or fraudulent activity detected"
+  ],
+  "certificateRejection": [
+    "Certificate is expired",
+    "Certificate image is unclear or low quality",
+    "Certificate does not match the claimed service category",
+    "Issuing authority not recognized or not accredited",
+    "Certificate appears forged or altered",
+    "Missing critical details (e.g., name, date, signature)",
+    "Credentials are insufficient to allow service creation"
+  ],
+  "deactivationReasons": [
+    "Multiple unresolved complaints from other users",
+    "Repeated violation of platform policies",
+    "Fraudulent or suspicious transactions",
+    "Harassment or abusive behavior",
+    "Consistently poor service ratings or feedback",
+    "Failure to fulfill confirmed appointments",
+    "Providing false or misleading information during verification"
+  ]
+};
 
 interface CertificateWithProvider extends Certificate {
   provider_name: string;
@@ -11,7 +44,6 @@ interface CertificateWithProvider extends Certificate {
   verified_by?: string;
   verification_date?: string;
   rejection_reason?: string;
-  certificate_file_path?: string;
 }
 
 const getStatusBadge = (status: string) => {
@@ -52,6 +84,8 @@ export default function CertificatesPage() {
     status: string;
   } | null>(null);
   const [rejectionReason, setRejectionReason] = useState("");
+  const [customReason, setCustomReason] = useState("");
+  const [showCustomReason, setShowCustomReason] = useState(false);
 
   useEffect(() => {
     fetchCertificates();
@@ -121,6 +155,8 @@ export default function CertificatesPage() {
       await fetchCertificates();
       setSelectedCertificate(null);
       setRejectionReason("");
+      setCustomReason("");
+      setShowCustomReason(false);
     } catch (error) {
       console.error(`Error ${action}ing certificate:`, error);
       alert(`Failed to ${action} certificate. Please try again.`);
@@ -129,7 +165,7 @@ export default function CertificatesPage() {
 
   const handleViewDocument = (certificate: CertificateWithProvider) => {
     // Check for certificate_file_path first, then fallback to certificate_photo
-    const documentPath = certificate.certificate_file_path || certificate.certificate_photo;
+    const documentPath = certificate.certificate_file_path;;
     
     if (documentPath) {
       const documentUrl = getImageUrl(documentPath);
@@ -263,7 +299,7 @@ export default function CertificatesPage() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <div className="flex space-x-2">
-                      {(certificate.certificate_file_path || certificate.certificate_photo) ? (
+                      {(certificate.certificate_file_path) ? (
                         <button 
                           onClick={() => handleViewDocument(certificate)}
                           className="text-blue-600 hover:text-blue-900"
@@ -313,27 +349,68 @@ export default function CertificatesPage() {
             <p className="text-sm text-gray-600 mb-4">
               Please provide a reason for rejecting {selectedCertificate.providerName}&apos;s certificate:
             </p>
-            <textarea
-              value={rejectionReason}
-              onChange={(e) => setRejectionReason(e.target.value)}
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
-              rows={3}
-              placeholder="Enter rejection reason..."
-            />
+            
+            {/* Predefined Reasons Dropdown */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Select Reason
+              </label>
+              <select
+                value={rejectionReason}
+                onChange={(e) => {
+                  setRejectionReason(e.target.value);
+                  setShowCustomReason(e.target.value === "custom");
+                  if (e.target.value !== "custom") {
+                    setCustomReason("");
+                  }
+                }}
+                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
+              >
+                <option value="">Select a reason...</option>
+                {reasonsData.certificateRejection.map((reason: string, index: number) => (
+                  <option key={index} value={reason}>
+                    {reason}
+                  </option>
+                ))}
+                <option value="custom">Other (Custom Reason)</option>
+              </select>
+            </div>
+
+            {/* Custom Reason Input */}
+            {showCustomReason && (
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Custom Reason
+                </label>
+                <textarea
+                  value={customReason}
+                  onChange={(e) => setCustomReason(e.target.value)}
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
+                  rows={3}
+                  placeholder="Enter custom rejection reason..."
+                />
+              </div>
+            )}
+
             <div className="flex justify-end space-x-3 mt-4">
               <button
                 onClick={() => {
                   setSelectedCertificate(null);
                   setRejectionReason("");
+                  setCustomReason("");
+                  setShowCustomReason(false);
                 }}
                 className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
               >
                 Cancel
               </button>
               <button
-                onClick={() => handleCertificateAction(selectedCertificate.id, "reject", rejectionReason)}
-                disabled={!rejectionReason.trim()}
-                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 disabled:bg-red-400"
+                onClick={() => {
+                  const finalReason = showCustomReason ? customReason : rejectionReason;
+                  handleCertificateAction(selectedCertificate.id, "reject", finalReason);
+                }}
+                disabled={!rejectionReason || (showCustomReason && !customReason.trim())}
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 disabled:bg-red-400 disabled:cursor-not-allowed"
               >
                 Reject Certificate
               </button>

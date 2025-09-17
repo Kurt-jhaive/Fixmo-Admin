@@ -71,6 +71,18 @@ export const adminApi = {
     return response.json();
   },
 
+  async rejectUser(userId: number, reason: string) {
+    const response = await fetch(`${API_BASE_URL}/api/admin/users/${userId}/reject`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ reason }),
+    });
+    if (!response.ok) throw new Error('Failed to reject user');
+    return response.json();
+  },
+
   async activateUser(userId: number) {
     const response = await fetch(`${API_BASE_URL}/api/admin/users/${userId}/activate`, {
       method: 'PUT',
@@ -79,9 +91,13 @@ export const adminApi = {
     return response.json();
   },
 
-  async deactivateUser(userId: number) {
+  async deactivateUser(userId: number, reason?: string) {
     const response = await fetch(`${API_BASE_URL}/api/admin/users/${userId}/deactivate`, {
       method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: reason ? JSON.stringify({ reason }) : undefined,
     });
     if (!response.ok) throw new Error('Failed to deactivate user');
     return response.json();
@@ -118,14 +134,26 @@ export const adminApi = {
   },
 
   async verifyProvider(providerId: string, verified: boolean) {
-    const response = await fetch(`${API_BASE_URL}/api/admin/providers/${providerId}/verify`, {
+    const endpoint = verified ? 'verify' : 'reject';
+    const response = await fetch(`${API_BASE_URL}/api/admin/providers/${providerId}/${endpoint}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ verified }),
     });
     if (!response.ok) throw new Error('Failed to verify provider');
+    return response.json();
+  },
+
+  async rejectProvider(providerId: string, reason: string) {
+    const response = await fetch(`${API_BASE_URL}/api/admin/providers/${providerId}/reject`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ reason }),
+    });
+    if (!response.ok) throw new Error('Failed to reject provider');
     return response.json();
   },
 
@@ -146,9 +174,13 @@ export const adminApi = {
     return response.json();
   },
 
-  async deactivateProvider(providerId: number) {
+  async deactivateProvider(providerId: number, reason?: string) {
     const response = await fetch(`${API_BASE_URL}/api/admin/providers/${providerId}/deactivate`, {
       method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: reason ? JSON.stringify({ reason }) : undefined,
     });
     if (!response.ok) throw new Error('Failed to deactivate provider');
     return response.json();
@@ -221,14 +253,14 @@ export const adminApi = {
       const stats = {
         totalUsers: Array.isArray(users.users) ? users.users.length : (Array.isArray(users) ? users.length : 0),
         activeServiceProviders: Array.isArray(providers.providers) 
-          ? providers.providers.filter((p: any) => p.provider_isActivated).length 
-          : (Array.isArray(providers) ? providers.filter((p: any) => p.provider_isActivated).length : 0),
+          ? providers.providers.filter((p: ServiceProvider) => p.provider_isActivated).length 
+          : (Array.isArray(providers) ? providers.filter((p: ServiceProvider) => p.provider_isActivated).length : 0),
         pendingVerifications: Array.isArray(providers.providers)
-          ? providers.providers.filter((p: any) => !p.provider_isVerified).length
-          : (Array.isArray(providers) ? providers.filter((p: any) => !p.provider_isVerified).length : 0),
+          ? providers.providers.filter((p: ServiceProvider) => !p.provider_isVerified).length
+          : (Array.isArray(providers) ? providers.filter((p: ServiceProvider) => !p.provider_isVerified).length : 0),
         certificatesIssued: Array.isArray(certificates.certificates) 
-          ? certificates.certificates.filter((c: any) => c.certificate_status === 'approved').length
-          : (Array.isArray(certificates) ? certificates.filter((c: any) => c.certificate_status === 'approved').length : 0),
+          ? certificates.certificates.filter((c: Certificate) => c.certificate_status === 'approved').length
+          : (Array.isArray(certificates) ? certificates.filter((c: Certificate) => c.certificate_status === 'approved').length : 0),
       };
 
       console.log('Calculated dashboard stats:', stats);

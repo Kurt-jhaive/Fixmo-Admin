@@ -1,0 +1,32 @@
+{
+  "verificationRejection": [
+    "Uploaded ID is blurry or unreadable",
+    "Name on ID does not match account name",
+    "Expired or invalid government ID",
+    "Incomplete or inconsistent profile details",
+    "Location/address cannot be verified",
+    "Suspected fake or tampered ID",
+    "Duplicate or multiple accounts using the same ID",
+    "Suspicious or fraudulent activity detected"
+  ],
+
+  "certificateRejection": [
+    "Certificate is expired",
+    "Certificate image is unclear or low quality",
+    "Certificate does not match the claimed service category",
+    "Issuing authority not recognized or not accredited",
+    "Certificate appears forged or altered",
+    "Missing critical details (e.g., name, date, signature)",
+    "Credentials are insufficient to allow service creation"
+  ],
+
+  "deactivationReasons": [
+    "Multiple unresolved complaints from other users",
+    "Repeated violation of platform policies",
+    "Fraudulent or suspicious transactions",
+    "Harassment or abusive behavior",
+    "Consistently poor service ratings or feedback",
+    "Failure to fulfill confirmed appointments",
+    "Providing false or misleading information during verification"
+  ]
+}
