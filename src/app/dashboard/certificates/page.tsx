@@ -227,7 +227,7 @@ export default function CertificatesPage() {
           <select
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
-            className="border border-gray-300 rounded-md px-3 py-1 text-sm"
+            className="border border-gray-300 rounded-md px-3 py-2 text-sm text-gray-900 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           >
             <option value="all">All Certificates</option>
             <option value="pending">Pending Review</option>
@@ -298,16 +298,20 @@ export default function CertificatesPage() {
                     )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <div className="flex space-x-2">
+                    <div className="flex flex-wrap gap-2">
                       {(certificate.certificate_file_path) ? (
                         <button 
                           onClick={() => handleViewDocument(certificate)}
-                          className="text-blue-600 hover:text-blue-900"
+                          className="inline-flex items-center px-3 py-1.5 border border-blue-300 text-xs font-medium rounded-md text-blue-700 bg-blue-50 hover:bg-blue-100 hover:border-blue-400 transition-colors"
                         >
+                          <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                          </svg>
                           View Document
                         </button>
                       ) : (
-                        <span className="text-gray-400 cursor-not-allowed">
+                        <span className="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md text-gray-500 bg-gray-100">
                           No Document
                         </span>
                       )}
@@ -315,8 +319,11 @@ export default function CertificatesPage() {
                         <>
                           <button
                             onClick={() => handleCertificateAction(certificate.certificate_id, "approve")}
-                            className="bg-green-100 text-green-700 px-3 py-1 rounded text-sm hover:bg-green-200"
+                            className="inline-flex items-center px-3 py-1.5 border border-green-300 text-xs font-medium rounded-md text-green-700 bg-green-50 hover:bg-green-100 hover:border-green-400 transition-colors"
                           >
+                            <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
                             Approve
                           </button>
                           <button
@@ -326,8 +333,11 @@ export default function CertificatesPage() {
                               certificateType: certificate.certificate_name,
                               status: certificate.certificate_status
                             })}
-                            className="bg-red-100 text-red-700 px-3 py-1 rounded text-sm hover:bg-red-200"
+                            className="inline-flex items-center px-3 py-1.5 border border-red-300 text-xs font-medium rounded-md text-red-700 bg-red-50 hover:bg-red-100 hover:border-red-400 transition-colors"
                           >
+                            <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
                             Reject
                           </button>
                         </>
@@ -343,56 +353,75 @@ export default function CertificatesPage() {
 
       {/* Rejection Modal */}
       {selectedCertificate && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg max-w-md w-full mx-4">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Reject Certificate</h3>
-            <p className="text-sm text-gray-600 mb-4">
-              Please provide a reason for rejecting {selectedCertificate.providerName}&apos;s certificate:
-            </p>
-            
-            {/* Predefined Reasons Dropdown */}
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Select Reason
-              </label>
-              <select
-                value={rejectionReason}
-                onChange={(e) => {
-                  setRejectionReason(e.target.value);
-                  setShowCustomReason(e.target.value === "custom");
-                  if (e.target.value !== "custom") {
-                    setCustomReason("");
-                  }
-                }}
-                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
-              >
-                <option value="">Select a reason...</option>
-                {reasonsData.certificateRejection.map((reason: string, index: number) => (
-                  <option key={index} value={reason}>
-                    {reason}
-                  </option>
-                ))}
-                <option value="custom">Other (Custom Reason)</option>
-              </select>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-xl">
+            {/* Modal Header */}
+            <div className="bg-gradient-to-r from-red-600 to-red-700 px-6 py-4 rounded-t-lg">
+              <h3 className="text-lg font-semibold text-white flex items-center">
+                <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+                Reject Certificate
+              </h3>
             </div>
 
-            {/* Custom Reason Input */}
-            {showCustomReason && (
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Custom Reason
-                </label>
-                <textarea
-                  value={customReason}
-                  onChange={(e) => setCustomReason(e.target.value)}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
-                  rows={3}
-                  placeholder="Enter custom rejection reason..."
-                />
+            {/* Modal Body */}
+            <div className="p-6 space-y-6">
+              <div className="text-sm text-gray-600">
+                <p className="mb-2">
+                  <span className="font-medium">Provider:</span> {selectedCertificate.providerName}
+                </p>
+                <p className="mb-4">
+                  <span className="font-medium">Certificate:</span> {selectedCertificate.certificateType}
+                </p>
+                <p>Please provide a reason for rejecting this certificate:</p>
               </div>
-            )}
+              
+              {/* Predefined Reasons Dropdown */}
+              <div>
+                <label className="block text-sm font-medium text-gray-900 mb-2">
+                  Select Reason
+                </label>
+                <select
+                  value={rejectionReason}
+                  onChange={(e) => {
+                    setRejectionReason(e.target.value);
+                    setShowCustomReason(e.target.value === "custom");
+                    if (e.target.value !== "custom") {
+                      setCustomReason("");
+                    }
+                  }}
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                >
+                  <option value="">Select a reason...</option>
+                  {reasonsData.certificateRejection.map((reason: string, index: number) => (
+                    <option key={index} value={reason}>
+                      {reason}
+                    </option>
+                  ))}
+                  <option value="custom">Other (Custom Reason)</option>
+                </select>
+              </div>
 
-            <div className="flex justify-end space-x-3 mt-4">
+              {/* Custom Reason Input */}
+              {showCustomReason && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-900 mb-2">
+                    Custom Reason
+                  </label>
+                  <textarea
+                    value={customReason}
+                    onChange={(e) => setCustomReason(e.target.value)}
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                    rows={3}
+                    placeholder="Enter custom rejection reason..."
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-6 py-4 bg-gray-50 rounded-b-lg flex justify-end space-x-3">
               <button
                 onClick={() => {
                   setSelectedCertificate(null);
@@ -400,7 +429,7 @@ export default function CertificatesPage() {
                   setCustomReason("");
                   setShowCustomReason(false);
                 }}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
               >
                 Cancel
               </button>
@@ -410,7 +439,7 @@ export default function CertificatesPage() {
                   handleCertificateAction(selectedCertificate.id, "reject", finalReason);
                 }}
                 disabled={!rejectionReason || (showCustomReason && !customReason.trim())}
-                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 disabled:bg-red-400 disabled:cursor-not-allowed"
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 disabled:bg-red-400 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
               >
                 Reject Certificate
               </button>

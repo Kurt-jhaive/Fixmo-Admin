@@ -2,6 +2,121 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
 console.log('API_BASE_URL:', API_BASE_URL); // Debug log
 
+// Authentication interfaces
+export interface LoginRequest {
+  username: string;
+  password: string;
+}
+
+export interface LoginResponse {
+  message: string;
+  token: string;
+  admin: {
+    id: number;
+    username: string;
+    email: string;
+    name: string;
+    role: 'admin' | 'super_admin';
+    is_active: boolean;
+  };
+  must_change_password: boolean;
+}
+
+export interface ChangePasswordRequest {
+  current_password: string;
+  new_password: string;
+}
+
+// Authentication API functions
+export const authApi = {
+  async login(credentials: LoginRequest): Promise<LoginResponse> {
+    const response = await fetch(`${API_BASE_URL}/api/admin/login`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(credentials),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Login failed');
+    }
+
+    return response.json();
+  },
+
+  async changePassword(data: ChangePasswordRequest): Promise<{ message: string }> {
+    const token = localStorage.getItem('admin_token');
+    const response = await fetch(`${API_BASE_URL}/api/admin/change-password`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Password change failed');
+    }
+
+    return response.json();
+  },
+
+  async logout(): Promise<void> {
+    const token = localStorage.getItem('admin_token');
+    
+    try {
+      await fetch(`${API_BASE_URL}/api/admin/logout`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+    } catch (error) {
+      console.error('Logout API call failed:', error);
+    }
+
+    // Always clear local storage
+    localStorage.removeItem('admin_token');
+    localStorage.removeItem('admin_user');
+  },
+
+  getStoredToken(): string | null {
+    return localStorage.getItem('admin_token');
+  },
+
+  getStoredUser(): LoginResponse['admin'] | null {
+    const user = localStorage.getItem('admin_user');
+    return user ? JSON.parse(user) : null;
+  },
+
+  storeAuth(token: string, user: LoginResponse['admin']): void {
+    localStorage.setItem('admin_token', token);
+    localStorage.setItem('admin_user', JSON.stringify(user));
+  },
+
+  clearAuth(): void {
+    localStorage.removeItem('admin_token');
+    localStorage.removeItem('admin_user');
+  },
+
+  isAuthenticated(): boolean {
+    return !!this.getStoredToken();
+  }
+};
+
+// Helper function for authenticated requests
+const getAuthHeaders = (): HeadersInit => {
+  const token = authApi.getStoredToken();
+  return {
+    'Content-Type': 'application/json',
+    ...(token && { 'Authorization': `Bearer ${token}` }),
+  };
+};
+
 // Test if backend is reachable
 export const testBackendConnection = async () => {
   try {
@@ -44,7 +159,9 @@ export const adminApi = {
     const url = `${API_BASE_URL}/api/admin/users?${params}`;
     console.log('Fetching users from:', url); // Debug log
     
-    const response = await fetch(url);
+    const response = await fetch(url, {
+      headers: getAuthHeaders(),
+    });
     console.log('Users response status:', response.status); // Debug log
     
     if (!response.ok) {

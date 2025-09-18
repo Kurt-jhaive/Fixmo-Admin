@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { adminApi, ServiceProvider } from '@/lib/api';
-import { getImageUrl, handleImageError, getPlaceholderImage } from '@/lib/image-utils';
 import type { ReasonsData } from "@/types/reasons";
 
 // Import reasons data directly
@@ -85,8 +84,8 @@ export default function ServiceProvidersPage() {
           provider_last_name: "Johnson",
           provider_email: "mike.johnson@example.com",
           provider_phone_number: "+1234567892",
-          provider_profile_photo: "https://res.cloudinary.com/demo/image/upload/c_scale,w_100,h_100/v1/sample.jpg",
-          provider_valid_id: "https://res.cloudinary.com/demo/image/upload/c_scale,w_300,h_200/v1/sample.jpg",
+          provider_profile_photo: "https://res.cloudinary.com/demo/image/upload/w_100,h_100,c_fill,g_face/v1/sample.jpg",
+          provider_valid_id: "https://res.cloudinary.com/demo/image/upload/w_300,h_200,c_fit/v1/sample.jpg",
           provider_isVerified: true,
           created_at: new Date().toISOString(),
           provider_rating: 4.8,
@@ -103,8 +102,8 @@ export default function ServiceProvidersPage() {
           provider_last_name: "Wilson",
           provider_email: "sarah.wilson@example.com",
           provider_phone_number: "+1234567893",
-          provider_profile_photo: "https://res.cloudinary.com/demo/image/upload/c_scale,w_100,h_100/woman.jpg",
-          provider_valid_id: "https://res.cloudinary.com/demo/image/upload/c_scale,w_300,h_200/sample.jpg",
+          provider_profile_photo: "https://res.cloudinary.com/demo/image/upload/w_100,h_100,c_fill,g_face/v1/woman.jpg",
+          provider_valid_id: "https://res.cloudinary.com/demo/image/upload/w_300,h_200,c_fit/v1/sample.jpg",
           provider_isVerified: false,
           created_at: new Date().toISOString(),
           provider_rating: 4.2,
@@ -229,71 +228,88 @@ export default function ServiceProvidersPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Service Providers</h1>
-          <p className="text-gray-600 mt-2">Manage and verify service providers</p>
-        </div>
-        <div className="bg-white px-4 py-2 rounded-lg shadow">
-          <span className="text-sm text-gray-500">Total Providers: </span>
-          <span className="font-semibold text-blue-600">{providers.length}</span>
-        </div>
-      </div>
-
-      {/* Backend Status Indicator */}
-      <div className="flex items-center space-x-2">
-        <div className={`w-3 h-3 rounded-full ${
-          backendStatus === 'connected' ? 'bg-green-500' : 
-          backendStatus === 'disconnected' ? 'bg-red-500' : 'bg-yellow-500'
-        }`}></div>
-        <span className="text-sm text-gray-600">
-          Backend: {backendStatus === 'connected' ? 'Connected' : 
-                   backendStatus === 'disconnected' ? 'Disconnected (using mock data)' : 'Checking...'}
-        </span>
-      </div>
-
-      {/* Filters */}
-      <div className="bg-white p-4 rounded-lg shadow space-y-4">
-        <div className="flex flex-col sm:flex-row gap-4">
-          <div className="flex-1">
-            <input
-              type="text"
-              placeholder="Search providers..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+    <div className="space-y-6 p-6">
+      {/* Page Header */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200">
+        <div className="px-6 py-5">
+          <div className="flex justify-between items-center">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">Service Providers</h1>
+              <p className="text-gray-600 mt-1">Manage and verify service providers on the platform</p>
+            </div>
+            <div className="flex items-center space-x-4">
+              <div className="bg-blue-50 px-4 py-2 rounded-lg border border-blue-200">
+                <span className="text-sm text-blue-700">Total Providers: </span>
+                <span className="font-semibold text-blue-900">{providers.length}</span>
+              </div>
+              
+              {/* Backend Status Indicator */}
+              <div className="flex items-center space-x-2 bg-gray-50 px-3 py-2 rounded-lg border">
+                <div className={`w-3 h-3 rounded-full ${
+                  backendStatus === 'connected' ? 'bg-green-500' : 
+                  backendStatus === 'disconnected' ? 'bg-red-500' : 'bg-yellow-500'
+                }`}></div>
+                <span className="text-sm text-gray-600">
+                  Backend: {backendStatus === 'connected' ? 'Connected' : 
+                           backendStatus === 'disconnected' ? 'Disconnected (using mock data)' : 'Checking...'}
+                </span>
+              </div>
+            </div>
           </div>
-          <div>
-            <select
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value as 'all' | 'verified' | 'pending' | 'rejected')}
-              className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="all">All Status</option>
-              <option value="verified">Verified</option>
-              <option value="pending">Pending</option>
-              <option value="rejected">Rejected</option>
-            </select>
+        </div>
+      </div>
+
+      {/* Search and Filters */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200">
+        <div className="px-6 py-4">
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex-1">
+              <input
+                type="text"
+                placeholder="Search providers by name, email, or location..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+            <div>
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value as 'all' | 'verified' | 'pending' | 'rejected')}
+                className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white min-w-[140px]"
+              >
+                <option value="all" className="text-gray-900 bg-white">All Status</option>
+                <option value="verified" className="text-gray-900 bg-white">Verified</option>
+                <option value="pending" className="text-gray-900 bg-white">Pending</option>
+                <option value="rejected" className="text-gray-900 bg-white">Rejected</option>
+              </select>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Providers Table */}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div className="px-6 py-5 border-b border-gray-200 bg-gray-50">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-semibold text-gray-900">Service Providers</h2>
+            <span className="text-sm text-gray-500 bg-white px-3 py-1 rounded-full border">
+              {filteredProviders.length} providers
+            </span>
+          </div>
+        </div>
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+            <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Provider
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  ULI & Location
+                  ULI
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Type
+                  Location
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Rating
@@ -319,9 +335,12 @@ export default function ServiceProvidersPage() {
                       <div className="h-10 w-10 flex-shrink-0">
                         <img
                           className="h-10 w-10 rounded-full object-cover"
-                          src={getImageUrl(provider.provider_profile_photo) || getPlaceholderImage('profile')}
+                          src={provider.provider_profile_photo || "https://via.placeholder.com/40x40/f3f4f6/9ca3af?text=?"}
                           alt={fullName}
-                          onError={(e) => handleImageError(e, 'profile')}
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.src = "https://via.placeholder.com/40x40/f3f4f6/9ca3af?text=?";
+                          }}
                         />
                       </div>
                       <div className="ml-4">
@@ -333,11 +352,10 @@ export default function ServiceProvidersPage() {
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">{provider.provider_uli}</div>
-                    <div className="text-sm text-gray-500">{provider.provider_location}</div>
+                    <div className="text-sm font-medium text-gray-900">{provider.provider_uli}</div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    Service Provider
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm text-gray-900">{provider.provider_location}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
@@ -368,32 +386,36 @@ export default function ServiceProvidersPage() {
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
                     <button
                       onClick={() => viewProviderDetails(provider)}
-                      className="text-blue-600 hover:text-blue-900"
+                      className="text-blue-600 hover:text-blue-900 font-medium"
                     >
                       View
                     </button>
+                    {/* Show Approve/Reject only for unverified (pending) providers */}
                     {!provider.provider_isVerified && (
                       <>
                         <button
                           onClick={() => handleVerifyProvider(provider.provider_id.toString())}
-                          className="text-green-600 hover:text-green-900"
+                          className="text-green-600 hover:text-green-900 font-medium"
                         >
-                          Verify
+                          Approve
                         </button>
                         <button
                           onClick={() => handleRejectProvider(provider)}
-                          className="text-red-600 hover:text-red-900"
+                          className="text-red-600 hover:text-red-900 font-medium"
                         >
                           Reject
                         </button>
                       </>
                     )}
-                    <button
-                      onClick={() => handleStatusChange(provider.provider_id.toString(), provider.provider_isActivated ? 'inactive' : 'active')}
-                      className={provider.provider_isActivated ? "text-red-600 hover:text-red-900" : "text-green-600 hover:text-green-900"}
-                    >
-                      {provider.provider_isActivated ? 'Deactivate' : 'Activate'}
-                    </button>
+                    {/* Show Activate/Deactivate only for verified (approved) providers */}
+                    {provider.provider_isVerified && (
+                      <button
+                        onClick={() => handleStatusChange(provider.provider_id.toString(), provider.provider_isActivated ? 'inactive' : 'active')}
+                        className={`font-medium ${provider.provider_isActivated ? "text-red-600 hover:text-red-900" : "text-green-600 hover:text-green-900"}`}
+                      >
+                        {provider.provider_isActivated ? 'Deactivate' : 'Activate'}
+                      </button>
+                    )}
                   </td>
                 </tr>
                 );
@@ -405,20 +427,24 @@ export default function ServiceProvidersPage() {
 
       {/* Provider Details Modal */}
       {showModal && selectedProvider && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6">
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-bold text-gray-900">Provider Details</h2>
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg w-full max-w-5xl max-h-[95vh] overflow-hidden flex flex-col">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-4 flex-shrink-0">
+              <div className="flex justify-between items-center">
+                <h2 className="text-xl font-bold text-white">Service Provider Details</h2>
                 <button
                   onClick={() => setShowModal(false)}
-                  className="text-gray-400 hover:text-gray-600"
+                  className="text-white hover:text-gray-200 text-2xl font-bold w-8 h-8 flex items-center justify-center rounded-full hover:bg-white hover:bg-opacity-20 transition-colors"
                 >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
+                  ×
                 </button>
               </div>
+            </div>
+            
+            {/* Scrollable Content */}
+            <div className="flex-1 overflow-y-auto">
+              <div className="p-6">
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-4">
@@ -483,70 +509,134 @@ export default function ServiceProvidersPage() {
                     <div className="space-y-4">
                       <div>
                         <label className="text-sm font-medium text-gray-500">Profile Photo</label>
-                        <img
-                          src={getImageUrl(selectedProvider.provider_profile_photo) || getPlaceholderImage('profile')}
-                          alt="Profile"
-                          className="w-32 h-32 object-cover rounded-lg border"
-                          onError={(e) => handleImageError(e, 'profile')}
-                        />
+                        <div className="relative group cursor-pointer inline-block">
+                          <img
+                            src={selectedProvider.provider_profile_photo || "https://via.placeholder.com/150x150/f3f4f6/9ca3af?text=No+Photo"}
+                            alt="Profile"
+                            className="w-32 h-32 object-cover rounded-lg border transition-all duration-200 group-hover:border-blue-500 group-hover:shadow-lg"
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              target.src = "https://via.placeholder.com/150x150/f3f4f6/9ca3af?text=No+Photo";
+                            }}
+                            onClick={() => {
+                              const imageUrl = selectedProvider.provider_profile_photo;
+                              if (imageUrl) {
+                                window.open(imageUrl, '_blank');
+                              }
+                            }}
+                          />
+                          <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 rounded-lg flex items-center justify-center">
+                            <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-white bg-opacity-90 px-2 py-1 rounded text-xs font-medium text-gray-700">
+                              Click to enlarge
+                            </div>
+                          </div>
+                        </div>
                       </div>
                       {selectedProvider.provider_valid_id && (
                         <div>
                           <label className="text-sm font-medium text-gray-500">Valid ID</label>
-                          <img
-                            src={getImageUrl(selectedProvider.provider_valid_id) || getPlaceholderImage('document')}
-                            alt="Valid ID"
-                            className="w-64 h-40 object-cover rounded-lg border"
-                            onError={(e) => handleImageError(e, 'document')}
-                          />
+                          <div className="relative group cursor-pointer inline-block">
+                            <img
+                              src={selectedProvider.provider_valid_id || "https://via.placeholder.com/300x200/f3f4f6/9ca3af?text=No+Document"}
+                              alt="Valid ID"
+                              className="w-64 h-40 object-cover rounded-lg border transition-all duration-200 group-hover:border-blue-500 group-hover:shadow-lg"
+                              onError={(e) => {
+                                const target = e.target as HTMLImageElement;
+                                target.src = "https://via.placeholder.com/300x200/f3f4f6/9ca3af?text=No+Document";
+                              }}
+                              onClick={() => {
+                                const imageUrl = selectedProvider.provider_valid_id;
+                                if (imageUrl) {
+                                  window.open(imageUrl, '_blank');
+                                }
+                              }}
+                            />
+                            <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 rounded-lg flex items-center justify-center">
+                              <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-white bg-opacity-90 px-3 py-1 rounded-full text-sm font-medium text-gray-700">
+                                Click to view larger
+                              </div>
+                            </div>
+                          </div>
                         </div>
                       )}
                     </div>
                   </div>
 
-                  <div className="pt-4 border-t">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Actions</h3>
-                    <div className="space-y-3">
-                      {!selectedProvider.provider_isVerified ? (
-                        <button
-                          onClick={() => {
-                            handleVerifyProvider(selectedProvider.provider_id.toString());
-                            setShowModal(false);
-                          }}
-                          className="w-full bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700"
-                        >
-                          Verify Provider
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => {
-                            handleRejectProvider(selectedProvider);
-                            setShowModal(false);
-                          }}
-                          className="w-full bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700"
-                        >
-                          Revoke Verification
-                        </button>
+                  <div className="pt-6 border-t border-gray-200 bg-gray-50 -mx-6 px-6 pb-6 mt-6">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Administrative Actions</h3>
+                    <div className="grid grid-cols-1 gap-3">
+                      {/* Verification Actions - Only for unverified (pending) providers */}
+                      {!selectedProvider.provider_isVerified && (
+                        <div className="bg-white p-4 rounded-lg border border-gray-200">
+                          <h4 className="text-sm font-medium text-gray-700 mb-2">Verification Actions</h4>
+                          <div className="grid grid-cols-2 gap-2">
+                            <button
+                              onClick={() => {
+                                handleVerifyProvider(selectedProvider.provider_id.toString());
+                                setShowModal(false);
+                              }}
+                              className="flex items-center justify-center px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors"
+                            >
+                              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              </svg>
+                              Approve
+                            </button>
+                            <button
+                              onClick={() => {
+                                handleRejectProvider(selectedProvider);
+                                setShowModal(false);
+                              }}
+                              className="flex items-center justify-center px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors"
+                            >
+                              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                              Reject
+                            </button>
+                          </div>
+                        </div>
                       )}
                       
-                      <button
-                        onClick={() => {
-                          handleStatusChange(
-                            selectedProvider.provider_id.toString(), 
-                            selectedProvider.provider_isActivated ? 'inactive' : 'active'
-                          );
-                          setShowModal(false);
-                        }}
-                        className={`w-full px-4 py-2 rounded-md ${
-                          selectedProvider.provider_isActivated
-                            ? 'bg-red-600 hover:bg-red-700 text-white'
-                            : 'bg-green-600 hover:bg-green-700 text-white'
-                        }`}
-                      >
-                        {selectedProvider.provider_isActivated ? 'Deactivate' : 'Activate'} Provider
-                      </button>
+                      {/* Account Status Actions - Only for verified (approved) providers */}
+                      {selectedProvider.provider_isVerified && (
+                        <div className="bg-white p-4 rounded-lg border border-gray-200">
+                          <h4 className="text-sm font-medium text-gray-700 mb-2">Account Status</h4>
+                          <button
+                            onClick={() => {
+                              handleStatusChange(
+                                selectedProvider.provider_id.toString(), 
+                                selectedProvider.provider_isActivated ? 'inactive' : 'active'
+                              );
+                              setShowModal(false);
+                            }}
+                            className={`w-full flex items-center justify-center px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                              selectedProvider.provider_isActivated
+                                ? 'bg-red-600 hover:bg-red-700 text-white'
+                                : 'bg-green-600 hover:bg-green-700 text-white'
+                            }`}
+                          >
+                            {selectedProvider.provider_isActivated ? (
+                              <>
+                                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636m12.728 12.728L18.364 5.636M5.636 18.364l12.728-12.728" />
+                                </svg>
+                                Deactivate Provider
+                              </>
+                            ) : (
+                              <>
+                                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                </svg>
+                                Activate Provider
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
+                </div>
                 </div>
               </div>
             </div>

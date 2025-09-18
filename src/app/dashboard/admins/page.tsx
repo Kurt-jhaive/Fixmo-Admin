@@ -193,15 +193,15 @@ export default function AdminsPage() {
                     <div className="flex space-x-2">
                       <button
                         onClick={() => handleSendInvite(admin.id)}
-                        className="text-blue-600 hover:text-blue-900"
+                        className="text-blue-600 hover:text-blue-900 font-medium"
                       >
                         Send Invite
                       </button>
-                      <button className="text-gray-600 hover:text-gray-900">
+                      <button className="text-gray-600 hover:text-gray-900 font-medium">
                         Edit
                       </button>
                       {admin.status === "active" && (
-                        <button className="text-red-600 hover:text-red-900">
+                        <button className="text-red-600 hover:text-red-900 font-medium">
                           Deactivate
                         </button>
                       )}
@@ -216,68 +216,85 @@ export default function AdminsPage() {
 
       {/* Add Admin Modal */}
       {showAddAdminModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg max-w-md w-full mx-4">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Add New Administrator</h3>
-            <div className="space-y-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-xl">
+            {/* Modal Header */}
+            <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-4 rounded-t-lg">
+              <h3 className="text-lg font-semibold text-white flex items-center">
+                <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M8 9a3 3 0 100-6 3 3 0 000 6zM8 11a6 6 0 016 6H2a6 6 0 016-6zM16 7a1 1 0 10-2 0v1h-1a1 1 0 100 2h1v1a1 1 0 102 0v-1h1a1 1 0 100-2h-1V7z"/>
+                </svg>
+                Add New Administrator
+              </h3>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+                <label className="block text-sm font-medium text-gray-900 mb-2">Full Name</label>
                 <input
                   type="text"
                   value={newAdmin.name}
                   onChange={(e) => setNewAdmin({...newAdmin, name: e.target.value})}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   placeholder="Enter full name"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
+                <label className="block text-sm font-medium text-gray-900 mb-2">Email Address</label>
                 <input
                   type="email"
                   value={newAdmin.email}
                   onChange={(e) => setNewAdmin({...newAdmin, email: e.target.value})}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   placeholder="Enter email address"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
+                <label className="block text-sm font-medium text-gray-900 mb-2">Role</label>
                 <select
                   value={newAdmin.role}
                   onChange={(e) => setNewAdmin({...newAdmin, role: e.target.value})}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 >
                   <option value="Junior Admin">Junior Admin</option>
                   <option value="Admin">Admin</option>
                   <option value="Senior Admin">Senior Admin</option>
                 </select>
               </div>
-              <div className="bg-gray-50 p-3 rounded-md">
-                <div className="text-sm font-medium text-gray-700 mb-2">Permissions for {newAdmin.role}:</div>
-                <div className="flex flex-wrap gap-1">
+              <div className="bg-blue-50 border border-blue-200 p-4 rounded-md">
+                <div className="text-sm font-medium text-blue-900 mb-3">Permissions for {newAdmin.role}:</div>
+                <div className="flex flex-wrap gap-2">
                   {rolePermissions[newAdmin.role as keyof typeof rolePermissions]?.map(permission => (
-                    <span key={permission} className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                    <span key={permission} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                       {permission.replace("_", " ")}
                     </span>
                   ))}
                 </div>
               </div>
-              <div className="bg-yellow-50 p-3 rounded-md">
-                <div className="text-sm text-yellow-800">
-                  📧 An invitation email will be sent to the admin with login credentials and access instructions.
+              <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-md">
+                <div className="flex items-start">
+                  <svg className="w-5 h-5 text-yellow-600 mr-2 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd"/>
+                  </svg>
+                  <div className="text-sm text-yellow-800">
+                    An invitation email will be sent to the admin with login credentials and access instructions.
+                  </div>
                 </div>
               </div>
             </div>
-            <div className="flex justify-end space-x-3 mt-6">
+
+            {/* Modal Footer */}
+            <div className="px-6 py-4 bg-gray-50 rounded-b-lg flex justify-end space-x-3">
               <button
                 onClick={() => setShowAddAdminModal(false)}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
               >
                 Cancel
               </button>
               <button
                 onClick={handleAddAdmin}
-                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
               >
                 Add Admin & Send Invite
               </button>
