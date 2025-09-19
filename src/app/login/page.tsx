@@ -158,7 +158,12 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="w-full flex justify-center py-3 px-4 border-2 border-blue-600 rounded-lg shadow-sm text-sm font-semibold transition-colors btn-login"
+              style={{
+                backgroundColor: '#2563eb !important',
+                color: '#ffffff !important',
+                borderColor: '#2563eb !important'
+              }}
             >
               {loading ? (
                 <div className="flex items-center">
@@ -174,21 +179,14 @@ export default function LoginPage() {
             </button>
           </form>
 
-          {/* Default Credentials Help */}
-          <div className="mt-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
-            <h3 className="text-sm font-semibold text-gray-700 mb-2">Default Super Admin Credentials:</h3>
-            <div className="text-sm text-gray-600 space-y-1">
-              <p><span className="font-medium">Username:</span> super@fixmo.local</p>
-              <p><span className="font-medium">Password:</span> SuperAdmin2024!</p>
-              <p className="text-xs text-yellow-600 mt-2">⚠️ You will be required to change your password on first login.</p>
-            </div>
-          </div>
+          
+          
         </div>
 
         {/* Footer */}
         <div className="text-center mt-8">
           <p className="text-sm text-gray-500">
-            © 2024 Fixmo Admin System. All rights reserved.
+            © 2025 Fixmo Admin System. All rights reserved.
           </p>
         </div>
       </div>

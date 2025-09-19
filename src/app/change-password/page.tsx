@@ -382,7 +382,12 @@ export default function ChangePasswordPage() {
             <button
               type="submit"
               disabled={loading || passwordErrors.length > 0 || passwords.new_password !== passwords.confirm_password}
-              className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-semibold text-white bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="w-full flex justify-center py-3 px-4 border-2 border-orange-600 rounded-lg shadow-sm text-sm font-semibold transition-colors btn-orange disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{
+                backgroundColor: '#ea580c !important',
+                color: '#ffffff !important',
+                borderColor: '#ea580c !important'
+              }}
             >
               {loading ? (
                 <div className="flex items-center">
@@ -402,7 +407,7 @@ export default function ChangePasswordPage() {
         {/* Footer */}
         <div className="text-center mt-8">
           <p className="text-sm text-gray-500">
-            © 2024 Fixmo Admin System. All rights reserved.
+            © 2025 Fixmo Admin System. All rights reserved.
           </p>
         </div>
       </div>

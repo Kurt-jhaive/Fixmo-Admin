@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { adminApi, Admin, authApi } from "@/lib/api";
 
 const rolePermissions = {
@@ -18,6 +19,29 @@ const getStatusBadge = (status: boolean) => {
 };
 
 export default function AdminsPage() {
+  const router = useRouter();
+  const [currentUser, setCurrentUser] = useState<any>(null);
+
+  // Check authentication and role authorization
+  useEffect(() => {
+    const user = authApi.getStoredUser();
+    
+    // Check if user is authenticated
+    if (!authApi.isAuthenticated() || !user) {
+      router.push('/login');
+      return;
+    }
+
+    // Check if user has super_admin role
+    if (user.role !== 'super_admin') {
+      // Redirect regular admins to dashboard with a message
+      alert('Access Denied: Only Super Admins can access Admin Management.');
+      router.push('/dashboard');
+      return;
+    }
+
+  }, [router]);
+
   const [admins, setAdmins] = useState<Admin[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -29,7 +53,6 @@ export default function AdminsPage() {
   const [resetPasswordReason, setResetPasswordReason] = useState("");
   const [confirmAction, setConfirmAction] = useState<{ type: 'deactivate' | 'activate', admin: Admin } | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
-  const [currentUser, setCurrentUser] = useState<Admin | null>(null);
   const [newAdmin, setNewAdmin] = useState({
     name: "",
     email: "",
@@ -208,6 +231,18 @@ export default function AdminsPage() {
     }
   };
 
+  // Show loading or redirect if not authorized
+  if (!currentUser) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Checking authorization...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -222,9 +257,10 @@ export default function AdminsPage() {
         </div>
         <button
           onClick={() => setShowAddAdminModal(true)}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 font-medium shadow-sm"
+          className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 font-bold shadow-lg border-2 border-blue-600 hover:border-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200"
+          style={{ color: '#ffffff !important', backgroundColor: '#2563eb !important' }}
         >
-          Add New Admin
+          ➕ Add New Admin
         </button>
       </div>
 
@@ -378,21 +414,24 @@ export default function AdminsPage() {
                         <div className="flex space-x-2">
                           <button 
                             onClick={() => handleResetPassword(admin)}
-                            className="inline-flex items-center px-3 py-1.5 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors duration-200 shadow-sm"
+                            className="inline-flex items-center px-3 py-1.5 text-xs font-bold text-white bg-blue-600 border-2 border-blue-600 hover:bg-blue-700 hover:border-blue-700 rounded-md transition-colors duration-200 shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            style={{ color: '#ffffff !important', backgroundColor: '#2563eb !important' }}
                           >
                             Reset Password
                           </button>
                           {admin.is_active ? (
                             <button 
                               onClick={() => handleToggleStatus(admin)}
-                              className="inline-flex items-center px-3 py-1.5 text-xs font-medium text-white bg-red-600 hover:bg-red-700 rounded-md transition-colors duration-200 shadow-sm"
+                              className="inline-flex items-center px-3 py-1.5 text-xs font-bold text-white bg-red-600 border-2 border-red-600 hover:bg-red-700 hover:border-red-700 rounded-md transition-colors duration-200 shadow-md focus:outline-none focus:ring-2 focus:ring-red-500"
+                              style={{ color: '#ffffff !important', backgroundColor: '#dc2626 !important' }}
                             >
                               Deactivate
                             </button>
                           ) : (
                             <button 
                               onClick={() => handleToggleStatus(admin)}
-                              className="inline-flex items-center px-3 py-1.5 text-xs font-medium text-white bg-green-600 hover:bg-green-700 rounded-md transition-colors duration-200 shadow-sm"
+                              className="inline-flex items-center px-3 py-1.5 text-xs font-bold text-white bg-green-600 border-2 border-green-600 hover:bg-green-700 hover:border-green-700 rounded-md transition-colors duration-200 shadow-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                              style={{ color: '#ffffff !important', backgroundColor: '#16a34a !important' }}
                             >
                               Activate
                             </button>
@@ -485,17 +524,19 @@ export default function AdminsPage() {
             </div>
 
             {/* Modal Footer */}
-            <div className="px-6 py-4 bg-gray-50 rounded-b-lg flex justify-end space-x-3">
+            <div className="px-6 py-4 bg-gray-50 rounded-b-lg flex justify-end space-x-3 border-t border-gray-200">
               <button
                 onClick={() => setShowAddAdminModal(false)}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                className="px-4 py-2 text-sm font-medium text-gray-900 bg-white border-2 border-gray-300 rounded-md hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200"
+                style={{ color: '#1f2937 !important', backgroundColor: '#ffffff !important' }}
               >
                 Cancel
               </button>
               <button
                 onClick={handleAddAdmin}
                 disabled={actionLoading || !newAdmin.name.trim() || !newAdmin.email.trim()}
-                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border-2 border-blue-600 rounded-md hover:bg-blue-700 hover:border-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center transition-all duration-200 shadow-md"
+                style={{ color: '#ffffff !important', backgroundColor: '#2563eb !important' }}
               >
                 {actionLoading && (
                   <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
@@ -552,21 +593,23 @@ export default function AdminsPage() {
               </div>
             </div>
 
-            <div className="px-6 py-4 bg-gray-50 rounded-b-lg flex justify-end space-x-3">
+            <div className="px-6 py-4 bg-gray-50 rounded-b-lg flex justify-end space-x-3 border-t border-gray-200">
               <button
                 onClick={() => {
                   setShowResetPasswordModal(false);
                   setSelectedAdmin(null);
                   setResetPasswordReason("");
                 }}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+                className="px-4 py-2 text-sm font-medium text-gray-900 bg-white border-2 border-gray-300 rounded-md hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200"
+                style={{ color: '#1f2937 !important', backgroundColor: '#ffffff !important' }}
               >
                 Cancel
               </button>
               <button
                 onClick={handleConfirmResetPassword}
                 disabled={actionLoading}
-                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border-2 border-blue-600 rounded-md hover:bg-blue-700 hover:border-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200 shadow-md"
+                style={{ color: '#ffffff !important', backgroundColor: '#2563eb !important' }}
               >
                 {actionLoading && (
                   <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
@@ -614,24 +657,29 @@ export default function AdminsPage() {
               </div>
             </div>
 
-            <div className="px-6 py-4 bg-gray-50 rounded-b-lg flex justify-end space-x-3">
+            <div className="px-6 py-4 bg-gray-50 rounded-b-lg flex justify-end space-x-3 border-t border-gray-200">
               <button
                 onClick={() => {
                   setShowConfirmModal(false);
                   setConfirmAction(null);
                 }}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+                className="px-4 py-2 text-sm font-medium text-gray-900 bg-white border-2 border-gray-300 rounded-md hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200"
+                style={{ color: '#1f2937 !important', backgroundColor: '#ffffff !important' }}
               >
                 Cancel
               </button>
               <button
                 onClick={handleConfirmToggleStatus}
                 disabled={actionLoading}
-                className={`px-4 py-2 text-sm font-medium text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center ${
+                className={`px-4 py-2 text-sm font-medium text-white border-2 rounded-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center focus:outline-none focus:ring-2 transition-all duration-200 shadow-md ${
                   confirmAction.type === 'deactivate' 
-                    ? 'bg-red-600 hover:bg-red-700' 
-                    : 'bg-green-600 hover:bg-green-700'
+                    ? 'bg-red-600 border-red-600 hover:bg-red-700 hover:border-red-700 focus:ring-red-500' 
+                    : 'bg-green-600 border-green-600 hover:bg-green-700 hover:border-green-700 focus:ring-green-500'
                 }`}
+                style={{ 
+                  color: '#ffffff !important', 
+                  backgroundColor: confirmAction.type === 'deactivate' ? '#dc2626 !important' : '#16a34a !important' 
+                }}
               >
                 {actionLoading && (
                   <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
