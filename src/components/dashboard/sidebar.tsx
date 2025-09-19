@@ -50,7 +50,7 @@ export function Sidebar() {
   const [userRole, setUserRole] = useState<string | null>(null);
 
   useEffect(() => {
-    // Get user role from localStorage
+    // Get user data from localStorage
     const user = authApi.getStoredUser();
     if (user) {
       setUserRole(user.role);
@@ -66,17 +66,13 @@ export function Sidebar() {
     <div className={`bg-gray-900 text-white transition-all duration-300 ${isCollapsed ? "w-16" : "w-64"}`}>
       <div className="p-4">
         <div className="flex items-center space-x-2">
-          <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center text-white font-bold">
+          <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center text-white font-bold shadow-lg">
             F
           </div>
-          {!isCollapsed && <span className="text-xl font-bold">Fixmo Admin</span>}
+          {!isCollapsed && (
+            <span className="text-xl font-bold text-white">Fixmo Admin</span>
+          )}
         </div>
-        {/* Show user role indicator */}
-        {!isCollapsed && userRole && (
-          <div className="mt-2 text-xs text-gray-400">
-            Role: {userRole === 'super_admin' ? 'Super Admin' : 'Admin'}
-          </div>
-        )}
       </div>
       
       <nav className="mt-8">
@@ -97,9 +93,22 @@ export function Sidebar() {
       <div className="absolute bottom-4 left-4">
         <button
           onClick={() => setIsCollapsed(!isCollapsed)}
-          className="text-gray-400 hover:text-white"
+          className="flex items-center justify-center w-8 h-8 bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white rounded-lg transition-all duration-200 shadow-lg border border-gray-700"
+          title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
-          {isCollapsed ? "→" : "←"}
+          <svg 
+            className={`w-4 h-4 transition-transform duration-200 ${isCollapsed ? 'rotate-180' : ''}`} 
+            fill="none" 
+            stroke="currentColor" 
+            viewBox="0 0 24 24"
+          >
+            <path 
+              strokeLinecap="round" 
+              strokeLinejoin="round" 
+              strokeWidth={2} 
+              d="M15 19l-7-7 7-7" 
+            />
+          </svg>
         </button>
       </div>
     </div>
