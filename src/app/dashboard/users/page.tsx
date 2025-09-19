@@ -260,12 +260,12 @@ export default function UsersPage() {
           <input
             type="text"
             placeholder="Search users..."
-            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
             value={filters.search}
             onChange={(e) => setFilters({ ...filters, search: e.target.value })}
           />
           <select
-            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
             value={filters.verified === undefined ? "" : filters.verified.toString()}
             onChange={(e) => setFilters({ ...filters, verified: e.target.value === "" ? undefined : e.target.value === "true" })}
           >
@@ -274,7 +274,7 @@ export default function UsersPage() {
             <option value="false">Unverified</option>
           </select>
           <select
-            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
             value={filters.active === undefined ? "" : filters.active.toString()}
             onChange={(e) => setFilters({ ...filters, active: e.target.value === "" ? undefined : e.target.value === "true" })}
           >
@@ -444,8 +444,8 @@ export default function UsersPage() {
                   <SmartImage
                     src={selectedUser.profile_photo}
                     alt={`${selectedUser.first_name} ${selectedUser.last_name}`}
-                    width={100}
-                    height={100}
+                    width={96}
+                    height={96}
                     className="h-24 w-24 rounded-full object-cover ring-4 ring-blue-100"
                     fallbackType="profile"
                     fallbackContent={
@@ -574,7 +574,7 @@ export default function UsersPage() {
                     Rejection Reason
                   </label>
                   <select
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
                     value={showCustomReason ? "custom" : rejectionReason}
                     onChange={(e) => {
                       if (e.target.value === "custom") {
@@ -602,7 +602,7 @@ export default function UsersPage() {
                       Custom Rejection Reason
                     </label>
                     <textarea
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
                       rows={3}
                       placeholder="Enter custom rejection reason..."
                       value={customReason}
@@ -656,7 +656,7 @@ export default function UsersPage() {
                     Deactivation Reason
                   </label>
                   <select
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
                     value={showCustomReason ? "custom" : deactivationReason}
                     onChange={(e) => {
                       if (e.target.value === "custom") {
@@ -684,7 +684,7 @@ export default function UsersPage() {
                       Custom Deactivation Reason
                     </label>
                     <textarea
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
                       rows={3}
                       placeholder="Enter custom deactivation reason..."
                       value={customReason}

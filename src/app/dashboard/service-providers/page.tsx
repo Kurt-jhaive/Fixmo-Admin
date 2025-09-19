@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { adminApi, ServiceProvider } from '@/lib/api';
+import { SmartImage } from '@/components/SmartImage';
 import type { ReasonsData } from "@/types/reasons";
 
 // Import reasons data directly
@@ -269,7 +270,7 @@ export default function ServiceProvidersPage() {
                 placeholder="Search providers by name, email, or location..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white"
               />
             </div>
             <div>
@@ -333,14 +334,13 @@ export default function ServiceProvidersPage() {
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
                       <div className="h-10 w-10 flex-shrink-0">
-                        <img
-                          className="h-10 w-10 rounded-full object-cover"
-                          src={provider.provider_profile_photo || "https://via.placeholder.com/40x40/f3f4f6/9ca3af?text=?"}
+                        <SmartImage
+                          src={provider.provider_profile_photo}
                           alt={fullName}
-                          onError={(e) => {
-                            const target = e.target as HTMLImageElement;
-                            target.src = "https://via.placeholder.com/40x40/f3f4f6/9ca3af?text=?";
-                          }}
+                          width={40}
+                          height={40}
+                          className="h-10 w-10 rounded-full object-cover"
+                          fallbackType="profile"
                         />
                       </div>
                       <div className="ml-4">
@@ -510,14 +510,13 @@ export default function ServiceProvidersPage() {
                       <div>
                         <label className="text-sm font-medium text-gray-500">Profile Photo</label>
                         <div className="relative group cursor-pointer inline-block">
-                          <img
-                            src={selectedProvider.provider_profile_photo || "https://via.placeholder.com/150x150/f3f4f6/9ca3af?text=No+Photo"}
+                          <SmartImage
+                            src={selectedProvider.provider_profile_photo}
                             alt="Profile"
+                            width={128}
+                            height={128}
                             className="w-32 h-32 object-cover rounded-lg border transition-all duration-200 group-hover:border-blue-500 group-hover:shadow-lg"
-                            onError={(e) => {
-                              const target = e.target as HTMLImageElement;
-                              target.src = "https://via.placeholder.com/150x150/f3f4f6/9ca3af?text=No+Photo";
-                            }}
+                            fallbackType="profile"
                             onClick={() => {
                               const imageUrl = selectedProvider.provider_profile_photo;
                               if (imageUrl) {
@@ -525,25 +524,19 @@ export default function ServiceProvidersPage() {
                               }
                             }}
                           />
-                          <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 rounded-lg flex items-center justify-center">
-                            <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-white bg-opacity-90 px-2 py-1 rounded text-xs font-medium text-gray-700">
-                              Click to enlarge
-                            </div>
-                          </div>
                         </div>
                       </div>
                       {selectedProvider.provider_valid_id && (
                         <div>
                           <label className="text-sm font-medium text-gray-500">Valid ID</label>
                           <div className="relative group cursor-pointer inline-block">
-                            <img
-                              src={selectedProvider.provider_valid_id || "https://via.placeholder.com/300x200/f3f4f6/9ca3af?text=No+Document"}
+                            <SmartImage
+                              src={selectedProvider.provider_valid_id}
                               alt="Valid ID"
+                              width={256}
+                              height={160}
                               className="w-64 h-40 object-cover rounded-lg border transition-all duration-200 group-hover:border-blue-500 group-hover:shadow-lg"
-                              onError={(e) => {
-                                const target = e.target as HTMLImageElement;
-                                target.src = "https://via.placeholder.com/300x200/f3f4f6/9ca3af?text=No+Document";
-                              }}
+                              fallbackType="document"
                               onClick={() => {
                                 const imageUrl = selectedProvider.provider_valid_id;
                                 if (imageUrl) {
@@ -551,11 +544,6 @@ export default function ServiceProvidersPage() {
                                 }
                               }}
                             />
-                            <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 rounded-lg flex items-center justify-center">
-                              <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-white bg-opacity-90 px-3 py-1 rounded-full text-sm font-medium text-gray-700">
-                                Click to view larger
-                              </div>
-                            </div>
                           </div>
                         </div>
                       )}
@@ -686,7 +674,7 @@ export default function ServiceProvidersPage() {
                     Rejection Reason
                   </label>
                   <select
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
                     value={showCustomReason ? "custom" : rejectionReason}
                     onChange={(e) => {
                       if (e.target.value === "custom") {
@@ -714,7 +702,7 @@ export default function ServiceProvidersPage() {
                       Custom Rejection Reason
                     </label>
                     <textarea
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
                       rows={3}
                       placeholder="Enter custom rejection reason..."
                       value={customReason}
@@ -768,7 +756,7 @@ export default function ServiceProvidersPage() {
                     Deactivation Reason
                   </label>
                   <select
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
                     value={showCustomReason ? "custom" : deactivationReason}
                     onChange={(e) => {
                       if (e.target.value === "custom") {
@@ -796,7 +784,7 @@ export default function ServiceProvidersPage() {
                       Custom Deactivation Reason
                     </label>
                     <textarea
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
                       rows={3}
                       placeholder="Enter custom deactivation reason..."
                       value={customReason}

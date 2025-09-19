@@ -174,7 +174,7 @@ export default function ChangePasswordPage() {
                   name="current_password"
                   value={passwords.current_password}
                   onChange={handleInputChange}
-                  className="block w-full pl-10 pr-10 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors"
+                  className="block w-full pl-10 pr-10 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors text-gray-900 bg-white"
                   placeholder="Enter your current password"
                   required
                 />
@@ -214,7 +214,7 @@ export default function ChangePasswordPage() {
                   name="new_password"
                   value={passwords.new_password}
                   onChange={handleInputChange}
-                  className="block w-full pl-10 pr-10 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors"
+                  className="block w-full pl-10 pr-10 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors text-gray-900 bg-white"
                   placeholder="Enter your new password"
                   required
                 />
@@ -272,7 +272,7 @@ export default function ChangePasswordPage() {
                   name="confirm_password"
                   value={passwords.confirm_password}
                   onChange={handleInputChange}
-                  className="block w-full pl-10 pr-10 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors"
+                  className="block w-full pl-10 pr-10 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors text-gray-900 bg-white"
                   placeholder="Confirm your new password"
                   required
                 />
