@@ -379,9 +379,9 @@ export const adminApi = {
         pendingVerifications: Array.isArray(providers.providers)
           ? providers.providers.filter((p: ServiceProvider) => !p.provider_isVerified).length
           : (Array.isArray(providers) ? providers.filter((p: ServiceProvider) => !p.provider_isVerified).length : 0),
-        certificatesIssued: Array.isArray(certificates.certificates) 
-          ? certificates.certificates.filter((c: Certificate) => c.certificate_status === 'approved').length
-          : (Array.isArray(certificates) ? certificates.filter((c: Certificate) => c.certificate_status === 'approved').length : 0),
+        totalCertificates: Array.isArray(certificates.certificates) 
+          ? certificates.certificates.length
+          : (Array.isArray(certificates) ? certificates.length : 0),
       };
 
       console.log('Calculated dashboard stats:', stats);
@@ -393,7 +393,7 @@ export const adminApi = {
         totalUsers: 0,
         activeServiceProviders: 0,
         pendingVerifications: 0,
-        certificatesIssued: 0,
+        totalCertificates: 0,
       };
     }
   },
@@ -529,7 +529,7 @@ export interface DashboardStats {
   totalUsers: number;
   activeServiceProviders: number;
   pendingVerifications: number;
-  certificatesIssued: number;
+  totalCertificates: number;
 }
 
 export interface Admin {

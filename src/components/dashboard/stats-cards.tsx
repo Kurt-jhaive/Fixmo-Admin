@@ -33,7 +33,7 @@ export function StatsCards() {
               totalUsers: 156,
               activeServiceProviders: 43,
               pendingVerifications: 12,
-              certificatesIssued: 89,
+              totalCertificates: 89,
             });
           }
         } else {
@@ -43,7 +43,7 @@ export function StatsCards() {
             totalUsers: 156,
             activeServiceProviders: 43,
             pendingVerifications: 12,
-            certificatesIssued: 89,
+            totalCertificates: 89,
           });
         }
       } catch (error) {
@@ -54,7 +54,7 @@ export function StatsCards() {
           totalUsers: 156,
           activeServiceProviders: 43,
           pendingVerifications: 12,
-          certificatesIssued: 89,
+          totalCertificates: 89,
         });
       } finally {
         setLoading(false);
@@ -84,8 +84,8 @@ export function StatsCards() {
       color: "text-yellow-600",
     },
     {
-      title: "Certificates Issued",
-      value: stats?.certificatesIssued || 0,
+      title: "Total Certificates",
+      value: stats?.totalCertificates || 0,
       icon: "📜",
       color: "text-purple-600",
     },
