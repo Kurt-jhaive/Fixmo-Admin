@@ -1,6 +1,42 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+import { isTokenExpired, clearAuthAndRedirect } from './auth-utils';
 
 console.log('API_BASE_URL:', API_BASE_URL); // Debug log
+
+// Helper function for authenticated requests
+async function authenticatedFetch(url: string, options: RequestInit = {}): Promise<Response> {
+  const token = localStorage.getItem('token') || localStorage.getItem('adminToken');
+  
+  if (!token || isTokenExpired(token)) {
+    // Clear auth data but don't redirect here - let AuthWrapper handle it
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    localStorage.removeItem('adminToken');
+    localStorage.removeItem('adminUser');
+    throw new Error('Authentication required');
+  }
+
+  const response = await fetch(url, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+      ...options.headers,
+    },
+  });
+
+  // Handle 401 Unauthorized responses
+  if (response.status === 401) {
+    // Clear auth data but don't redirect here - let AuthWrapper handle it
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    localStorage.removeItem('adminToken');
+    localStorage.removeItem('adminUser');
+    throw new Error('Session expired. Please login again.');
+  }
+
+  return response;
+}
 
 // Authentication interfaces
 export interface LoginRequest {
@@ -66,7 +102,7 @@ export const authApi = {
   },
 
   async logout(): Promise<void> {
-    const token = localStorage.getItem('admin_token');
+    const token = this.getStoredToken();
     
     try {
       await fetch(`${API_BASE_URL}/api/admin/logout`, {
@@ -79,13 +115,12 @@ export const authApi = {
       console.error('Logout API call failed:', error);
     }
 
-    // Always clear local storage
-    localStorage.removeItem('admin_token');
-    localStorage.removeItem('admin_user');
+    // Always clear all auth data
+    this.clearAuth();
   },
 
   getStoredToken(): string | null {
-    return localStorage.getItem('admin_token');
+    return localStorage.getItem('token') || localStorage.getItem('adminToken') || localStorage.getItem('admin_token');
   },
 
   getStoredUser(): LoginResponse['admin'] | null {
@@ -94,18 +129,87 @@ export const authApi = {
   },
 
   storeAuth(token: string, user: LoginResponse['admin']): void {
-    localStorage.setItem('admin_token', token);
-    localStorage.setItem('admin_user', JSON.stringify(user));
+    // Store with consistent key names
+    localStorage.setItem('token', token);
+    localStorage.setItem('adminToken', token);
+    localStorage.setItem('admin_token', token); // Keep for backward compatibility
+    localStorage.setItem('user', JSON.stringify(user));
+    localStorage.setItem('adminUser', JSON.stringify(user));
+    localStorage.setItem('admin_user', JSON.stringify(user)); // Keep for backward compatibility
   },
 
   clearAuth(): void {
+    // Clear all possible token keys
+    localStorage.removeItem('token');
+    localStorage.removeItem('adminToken');
     localStorage.removeItem('admin_token');
+    localStorage.removeItem('user');
+    localStorage.removeItem('adminUser');
     localStorage.removeItem('admin_user');
   },
 
   isAuthenticated(): boolean {
     return !!this.getStoredToken();
+  },
+
+  // Check if token is expired
+  isTokenExpired(): boolean {
+    const token = this.getStoredToken();
+    if (!token) return true;
+
+    try {
+      // Decode JWT payload (basic parsing without verification)
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      const currentTime = Math.floor(Date.now() / 1000);
+      
+      // Check if token is expired (exp is in seconds)
+      return payload.exp && payload.exp < currentTime;
+    } catch (error) {
+      console.error('Error parsing token:', error);
+      return true; // Treat invalid tokens as expired
+    }
+  },
+
+  // Check if authenticated and token is not expired
+  isValidAuth(): boolean {
+    return this.isAuthenticated() && !this.isTokenExpired();
   }
+};
+
+// Helper function for authenticated requests with auto-logout on 401
+const makeAuthenticatedRequest = async (url: string, options: RequestInit = {}): Promise<Response> => {
+  const token = authApi.getStoredToken();
+  
+  // Check if token is expired before making request
+  if (!token || isTokenExpired(token)) {
+    // Clear auth data but don't redirect here - let AuthWrapper handle it
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    localStorage.removeItem('adminToken');
+    localStorage.removeItem('adminUser');
+    throw new Error('Session expired. Please login again.');
+  }
+
+  const response = await fetch(url, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+      ...options.headers,
+    },
+  });
+
+  // Handle 401 Unauthorized - token expired or invalid
+  if (response.status === 401) {
+    // Clear auth data but don't redirect here - let AuthWrapper handle it
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    localStorage.removeItem('adminToken');
+    localStorage.removeItem('adminUser');
+    throw new Error('Session expired. Please login again.');
+  }
+
+  return response;
 };
 
 // Helper function for authenticated requests
@@ -160,9 +264,7 @@ export const adminApi = {
     const url = `${API_BASE_URL}/api/admin/users?${params}`;
     console.log('Fetching users from:', url); // Debug log
     
-    const response = await fetch(url, {
-      headers: getAuthHeaders(),
-    });
+    const response = await makeAuthenticatedRequest(url);
     console.log('Users response status:', response.status); // Debug log
     
     if (!response.ok) {
@@ -176,17 +278,14 @@ export const adminApi = {
   },
 
   async getUserById(userId: number) {
-    const response = await fetch(`${API_BASE_URL}/api/admin/users/${userId}`, {
-      headers: getAuthHeaders(),
-    });
+    const response = await makeAuthenticatedRequest(`${API_BASE_URL}/api/admin/users/${userId}`);
     if (!response.ok) throw new Error('Failed to fetch user');
     return response.json();
   },
 
   async verifyUser(userId: number) {
-    const response = await fetch(`${API_BASE_URL}/api/admin/users/${userId}/verify`, {
+    const response = await makeAuthenticatedRequest(`${API_BASE_URL}/api/admin/users/${userId}/verify`, {
       method: 'PUT',
-      headers: getAuthHeaders(),
     });
     if (!response.ok) throw new Error('Failed to verify user');
     return response.json();

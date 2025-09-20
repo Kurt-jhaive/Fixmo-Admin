@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { authApi } from '@/lib/api';
+import { isTokenExpired, clearAuthAndRedirect } from '@/lib/auth-utils';
 
 interface AuthWrapperProps {
   children: React.ReactNode;
@@ -14,15 +15,48 @@ export default function AuthWrapper({ children }: AuthWrapperProps) {
 
   useEffect(() => {
     const checkAuth = () => {
-      const isAuth = authApi.isAuthenticated();
-      setIsAuthenticated(isAuth);
+      console.log('AuthWrapper: Checking authentication...');
+      const token = localStorage.getItem('token') || localStorage.getItem('adminToken');
+      console.log('AuthWrapper: Token found =', !!token);
       
-      if (!isAuth) {
+      // Check if token exists and is not expired
+      if (!token || isTokenExpired(token)) {
+        console.log('AuthWrapper: No token or token expired, redirecting to login...');
+        setIsAuthenticated(false);
+        // Clear auth data but don't redirect here
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        localStorage.removeItem('adminToken');
+        localStorage.removeItem('adminUser');
+        localStorage.removeItem('admin_token');
+        localStorage.removeItem('admin_user');
         router.push('/login');
+        return;
       }
+      
+      // Token exists and is valid
+      console.log('AuthWrapper: Token is valid, user authenticated');
+      setIsAuthenticated(true);
     };
 
     checkAuth();
+
+    // Set up periodic token validation (every 2 minutes)
+    const interval = setInterval(() => {
+      const token = localStorage.getItem('token') || localStorage.getItem('adminToken');
+      if (!token || isTokenExpired(token)) {
+        setIsAuthenticated(false);
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        localStorage.removeItem('adminToken');
+        localStorage.removeItem('adminUser');
+        localStorage.removeItem('admin_token');
+        localStorage.removeItem('admin_user');
+        router.push('/login');
+      }
+    }, 2 * 60 * 1000); // 2 minutes
+
+    return () => clearInterval(interval);
   }, [router]);
 
   // Show loading while checking authentication

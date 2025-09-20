@@ -36,11 +36,15 @@ export function Header() {
   const handleLogout = async () => {
     try {
       await authApi.logout();
+      // Clear local user state
+      setUser(null);
       router.push('/login');
     } catch (error) {
       console.error('Logout error:', error);
       // Even if API call fails, still logout locally
       authApi.clearAuth();
+      // Clear local user state
+      setUser(null);
       router.push('/login');
     }
   };

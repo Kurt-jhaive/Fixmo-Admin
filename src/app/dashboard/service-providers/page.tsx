@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { adminApi, ServiceProvider } from '@/lib/api';
 import { SmartImage } from '@/components/SmartImage';
+import { getImageUrl } from '@/lib/image-utils';
 import type { ReasonsData } from "@/types/reasons";
 
 // Import reasons data directly
@@ -346,7 +347,7 @@ export default function ServiceProvidersPage() {
                   Provider
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  ULI
+                  License ID
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Location
@@ -528,8 +529,8 @@ export default function ServiceProvidersPage() {
                     <h3 className="text-lg font-semibold text-gray-900 mb-4">Location Information</h3>
                     <div className="space-y-3">
                       <div>
-                        <label className="text-sm font-medium text-gray-500">ULI (Unique Location Identifier)</label>
-                        <p className="text-gray-900">{selectedProvider.provider_uli}</p>
+                        <label className="text-sm font-medium text-gray-500">License/ID Number</label>
+                        <p className="text-gray-900">{selectedProvider.provider_uli || 'Not provided'}</p>
                       </div>
                       {selectedProvider.provider_location && (
                         <div>
@@ -564,7 +565,10 @@ export default function ServiceProvidersPage() {
                             onClick={() => {
                               const imageUrl = selectedProvider.provider_profile_photo;
                               if (imageUrl) {
-                                window.open(imageUrl, '_blank');
+                                const processedUrl = getImageUrl(imageUrl);
+                                if (processedUrl) {
+                                  window.open(processedUrl, '_blank');
+                                }
                               }
                             }}
                           />
@@ -584,7 +588,10 @@ export default function ServiceProvidersPage() {
                               onClick={() => {
                                 const imageUrl = selectedProvider.provider_valid_id;
                                 if (imageUrl) {
-                                  window.open(imageUrl, '_blank');
+                                  const processedUrl = getImageUrl(imageUrl);
+                                  if (processedUrl) {
+                                    window.open(processedUrl, '_blank');
+                                  }
                                 }
                               }}
                             />

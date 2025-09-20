@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { adminApi, type User } from "@/lib/api";
 import SmartImage from "@/components/SmartImage";
+import { getImageUrl } from "@/lib/image-utils";
 import type { ReasonsData } from "@/types/reasons";
 
 // Import reasons data directly
@@ -456,10 +457,10 @@ export default function UsersPage() {
 
       {/* User Details Modal */}
       {showModal && selectedUser && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
-          <div className="relative mx-auto p-0 w-11/12 md:w-3/4 lg:w-2/3 xl:w-1/2 max-w-2xl bg-white rounded-xl shadow-2xl">
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="relative mx-auto w-11/12 md:w-3/4 lg:w-2/3 xl:w-1/2 max-w-2xl bg-white rounded-xl shadow-2xl max-h-[95vh] overflow-hidden my-8">
             {/* Header */}
-            <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-4 rounded-t-xl">
+            <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-4 rounded-t-xl flex-shrink-0">
               <div className="flex justify-between items-center">
                 <h3 className="text-xl font-semibold text-white">User Details</h3>
                 <button
@@ -471,8 +472,8 @@ export default function UsersPage() {
               </div>
             </div>
             
-            {/* Content */}
-            <div className="p-6">
+            {/* Scrollable Content */}
+            <div className="p-6 overflow-y-auto max-h-[calc(95vh-8rem)]">
               <div className="space-y-6">
                 {/* Profile Header */}
                 <div className="flex items-center space-x-6 pb-4 border-b border-gray-200">
@@ -586,17 +587,19 @@ export default function UsersPage() {
 
       {/* User Rejection Modal */}
       {showRejectModal && actionUser && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-20 mx-auto p-5 border w-11/12 md:w-1/2 lg:w-1/3 shadow-lg rounded-md bg-white">
-            <div className="mt-3">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-medium text-gray-900">Reject User Verification</h3>
-                <button
-                  onClick={() => setShowRejectModal(false)}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  ✕
-                </button>
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="relative mx-auto border w-11/12 md:w-1/2 lg:w-1/3 shadow-lg rounded-md bg-white max-h-[90vh] overflow-y-auto">
+            <div className="p-5">
+              <div className="mt-3">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-lg font-medium text-gray-900">Reject User Verification</h3>
+                  <button
+                    onClick={() => setShowRejectModal(false)}
+                    className="text-gray-400 hover:text-gray-600"
+                  >
+                    ✕
+                  </button>
+                </div>
               </div>
               
               <div className="space-y-4">
@@ -668,79 +671,81 @@ export default function UsersPage() {
 
       {/* User Deactivation Modal */}
       {showDeactivateModal && actionUser && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-20 mx-auto p-5 border w-11/12 md:w-1/2 lg:w-1/3 shadow-lg rounded-md bg-white">
-            <div className="mt-3">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-medium text-gray-900">Deactivate User</h3>
-                <button
-                  onClick={() => setShowDeactivateModal(false)}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  ✕
-                </button>
-              </div>
-              
-              <div className="space-y-4">
-                <p className="text-sm text-gray-600">
-                  You are deactivating: <strong>{actionUser.first_name} {actionUser.last_name}</strong>
-                </p>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Deactivation Reason
-                  </label>
-                  <select
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
-                    value={showCustomReason ? "custom" : deactivationReason}
-                    onChange={(e) => {
-                      if (e.target.value === "custom") {
-                        setShowCustomReason(true);
-                        setDeactivationReason("");
-                      } else {
-                        setShowCustomReason(false);
-                        setDeactivationReason(e.target.value);
-                      }
-                    }}
-                  >
-                    <option value="">Select a reason...</option>
-                    {reasonsData.deactivationReasons.map((reason: string, index: number) => (
-                      <option key={index} value={reason}>
-                        {reason}
-                      </option>
-                    ))}
-                    <option value="custom">Other (specify custom reason)</option>
-                  </select>
-                </div>
-
-                {showCustomReason && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Custom Deactivation Reason
-                    </label>
-                    <textarea
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
-                      rows={3}
-                      placeholder="Enter custom deactivation reason..."
-                      value={customReason}
-                      onChange={(e) => setCustomReason(e.target.value)}
-                    />
-                  </div>
-                )}
-
-                <div className="flex justify-end space-x-3 pt-4">
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="relative mx-auto border w-11/12 md:w-1/2 lg:w-1/3 shadow-lg rounded-md bg-white max-h-[90vh] overflow-y-auto">
+            <div className="p-5">
+              <div className="mt-3">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-lg font-medium text-gray-900">Deactivate User</h3>
                   <button
                     onClick={() => setShowDeactivateModal(false)}
-                    className="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500"
+                    className="text-gray-400 hover:text-gray-600"
                   >
-                    Cancel
+                    ✕
                   </button>
-                  <button
-                    onClick={confirmDeactivateUser}
-                    className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500"
-                  >
-                    Deactivate User
-                  </button>
+                </div>
+                
+                <div className="space-y-4">
+                  <p className="text-sm text-gray-600">
+                    You are deactivating: <strong>{actionUser.first_name} {actionUser.last_name}</strong>
+                  </p>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Deactivation Reason
+                    </label>
+                    <select
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
+                      value={showCustomReason ? "custom" : deactivationReason}
+                      onChange={(e) => {
+                        if (e.target.value === "custom") {
+                          setShowCustomReason(true);
+                          setDeactivationReason("");
+                        } else {
+                          setShowCustomReason(false);
+                          setDeactivationReason(e.target.value);
+                        }
+                      }}
+                    >
+                      <option value="">Select a reason...</option>
+                      {reasonsData.deactivationReasons.map((reason: string, index: number) => (
+                        <option key={index} value={reason}>
+                          {reason}
+                        </option>
+                      ))}
+                      <option value="custom">Other (specify custom reason)</option>
+                    </select>
+                  </div>
+
+                  {showCustomReason && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Custom Deactivation Reason
+                      </label>
+                      <textarea
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
+                        rows={3}
+                        placeholder="Enter custom deactivation reason..."
+                        value={customReason}
+                        onChange={(e) => setCustomReason(e.target.value)}
+                      />
+                    </div>
+                  )}
+
+                  <div className="flex justify-end space-x-3 pt-4">
+                    <button
+                      onClick={() => setShowDeactivateModal(false)}
+                      className="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={confirmDeactivateUser}
+                      className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500"
+                    >
+                      Deactivate User
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>

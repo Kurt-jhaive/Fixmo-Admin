@@ -14,10 +14,17 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const router = useRouter();
 
-  // Check if already authenticated
+  // Check if already authenticated and token is valid
   useEffect(() => {
-    if (authApi.isAuthenticated()) {
+    console.log('Login page: Checking auth status...');
+    const isValid = authApi.isValidAuth();
+    console.log('Login page: isValidAuth =', isValid);
+    
+    if (isValid) {
+      console.log('Login page: User is authenticated, redirecting to dashboard...');
       router.push('/dashboard');
+    } else {
+      console.log('Login page: User is not authenticated, staying on login page');
     }
   }, [router]);
 
