@@ -53,6 +53,7 @@ export default function AdminsPage() {
   const [resetPasswordReason, setResetPasswordReason] = useState("");
   const [confirmAction, setConfirmAction] = useState<{ type: 'deactivate' | 'activate', admin: Admin } | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
   const [newAdmin, setNewAdmin] = useState({
     name: "",
     email: "",
@@ -243,6 +244,16 @@ export default function AdminsPage() {
     );
   }
 
+  // Filter admins based on search term
+  const filteredAdmins = Array.isArray(admins) ? admins.filter(admin => {
+    if (!searchTerm) return true;
+    const searchLower = searchTerm.toLowerCase();
+    return (
+      admin.name?.toLowerCase().includes(searchLower) ||
+      admin.email?.toLowerCase().includes(searchLower)
+    );
+  }) : [];
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -313,8 +324,12 @@ export default function AdminsPage() {
       {/* Admin Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-          <div className="text-sm font-medium text-gray-600">Total Admins</div>
-          <div className="text-2xl font-bold text-gray-900">{loading ? "..." : Array.isArray(admins) ? admins.length : 0}</div>
+          <div className="text-sm font-medium text-gray-600">
+            {searchTerm ? 'Search Results' : 'Total Admins'}
+          </div>
+          <div className="text-2xl font-bold text-gray-900">
+            {loading ? "..." : searchTerm ? `${filteredAdmins.length} of ${Array.isArray(admins) ? admins.length : 0}` : Array.isArray(admins) ? admins.length : 0}
+          </div>
           <div className="text-xs text-gray-500 mt-1">Excluding super admins</div>
         </div>
         <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
@@ -328,6 +343,28 @@ export default function AdminsPage() {
           <div className="text-2xl font-bold text-yellow-600">
             {loading ? "..." : Array.isArray(admins) ? admins.filter(a => a.must_change_password).length : 0}
           </div>
+        </div>
+      </div>
+
+      {/* Search and Add Admin */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-4 sm:space-y-0">
+          <div className="flex-1 max-w-md">
+            <input
+              type="text"
+              placeholder="Search by name or email..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm text-gray-900 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            />
+          </div>
+          <button
+            onClick={() => setShowAddAdminModal(true)}
+            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            style={{ color: '#ffffff !important', backgroundColor: '#2563eb !important', border: '2px solid #2563eb !important' }}
+          >
+            👨‍💼 Add New Admin
+          </button>
         </div>
       </div>
 
@@ -368,8 +405,8 @@ export default function AdminsPage() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {Array.isArray(admins) && admins.length > 0 ? (
-                  admins.map((admin) => (
+                {filteredAdmins.length > 0 ? (
+                  filteredAdmins.map((admin) => (
                     <tr key={admin.id || Math.random()} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">

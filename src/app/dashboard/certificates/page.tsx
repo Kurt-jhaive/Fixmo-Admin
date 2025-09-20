@@ -77,6 +77,7 @@ export default function CertificatesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState("all");
+  const [searchTerm, setSearchTerm] = useState("");
   const [selectedCertificate, setSelectedCertificate] = useState<{
     id: number;
     providerName: string;
@@ -89,13 +90,23 @@ export default function CertificatesPage() {
 
   useEffect(() => {
     fetchCertificates();
-  }, []);
+  }, [filter, searchTerm]);
 
   const fetchCertificates = async () => {
     try {
       setLoading(true);
       setError(null);
-      const data = await adminApi.getCertificates();
+      
+      // Prepare filters for API call
+      const filters: any = {};
+      if (filter !== "all") {
+        filters.status = filter;
+      }
+      if (searchTerm.trim()) {
+        filters.search = searchTerm.trim();
+      }
+      
+      const data = await adminApi.getCertificates(filters);
       setCertificates(data.certificates || data || []);
     } catch (err) {
       console.error('Error fetching certificates:', err);
@@ -136,14 +147,6 @@ export default function CertificatesPage() {
     }
   };
 
-  const filteredCertificates = certificates.filter(cert => {
-    if (filter === "all") return true;
-    if (filter === "pending") return cert.certificate_status === "pending";
-    if (filter === "expiring") return isExpiringSoon(cert.expiry_date);
-    if (filter === "expired") return cert.certificate_status === "expired";
-    return true;
-  });
-
   const handleCertificateAction = async (certId: number, action: "approve" | "reject", reason?: string) => {
     try {
       if (action === "approve") {
@@ -183,6 +186,40 @@ export default function CertificatesPage() {
     }
   };
 
+  // Filter certificates based on search term and filter
+  const filteredCertificates = certificates.filter(certificate => {
+    // Search filter
+    if (searchTerm.trim()) {
+      const searchLower = searchTerm.toLowerCase();
+      const matchesSearch = 
+        (certificate.provider_name && certificate.provider_name.toLowerCase().includes(searchLower)) ||
+        (certificate.certificate_name && certificate.certificate_name.toLowerCase().includes(searchLower)) ||
+        (certificate.certificate_type && certificate.certificate_type.toLowerCase().includes(searchLower)) ||
+        (certificate.certificate_status && certificate.certificate_status.toLowerCase().includes(searchLower)) ||
+        (certificate.certificate_number && certificate.certificate_number.toLowerCase().includes(searchLower));
+      
+      if (!matchesSearch) return false;
+    }
+    
+    // Status filter
+    if (filter !== 'all') {
+      if (filter === 'pending' && certificate.certificate_status !== 'pending') {
+        return false;
+      }
+      if (filter === 'approved' && !['approved', 'valid'].includes(certificate.certificate_status)) {
+        return false;
+      }
+      if (filter === 'expired' && certificate.certificate_status !== 'expired') {
+        return false;
+      }
+      if (filter === 'expiring' && !isExpiringSoon(certificate.expiry_date)) {
+        return false;
+      }
+    }
+    
+    return true;
+  });
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -195,10 +232,14 @@ export default function CertificatesPage() {
       </div>
 
       {/* Quick Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
           <div className="text-sm font-medium text-gray-600">Total Certificates</div>
           <div className="text-2xl font-bold text-gray-900">{certificates.length}</div>
+        </div>
+        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+          <div className="text-sm font-medium text-gray-600">Filtered Results</div>
+          <div className="text-2xl font-bold text-blue-600">{filteredCertificates.length}</div>
         </div>
         <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
           <div className="text-sm font-medium text-gray-600">Pending Review</div>
@@ -220,20 +261,40 @@ export default function CertificatesPage() {
         </div>
       </div>
 
-      {/* Filters */}
+      {/* Search and Filters */}
       <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-        <div className="flex items-center space-x-4">
-          <span className="text-sm font-medium text-gray-700">Filter by:</span>
-          <select
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-            className="border border-gray-300 rounded-md px-3 py-2 text-sm text-gray-900 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-          >
-            <option value="all">All Certificates</option>
-            <option value="pending">Pending Review</option>
-            <option value="expiring">Expiring Soon</option>
-            <option value="expired">Expired</option>
-          </select>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+          <div>
+            <input
+              type="text"
+              placeholder="Search by provider name, certificate type, or status..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm text-gray-900 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            />
+          </div>
+          <div className="flex items-center space-x-2">
+            <span className="text-sm font-medium text-gray-700">Filter by:</span>
+            <select
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              className="border border-gray-300 rounded-md px-3 py-2 text-sm text-gray-900 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            >
+              <option value="all">All Certificates</option>
+              <option value="pending">Pending Review</option>
+              <option value="expiring">Expiring Soon</option>
+              <option value="expired">Expired</option>
+              <option value="approved">Approved</option>
+            </select>
+          </div>
+          <div>
+            <button
+              onClick={fetchCertificates}
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              Refresh
+            </button>
+          </div>
         </div>
       </div>
 
@@ -348,6 +409,11 @@ export default function CertificatesPage() {
               ))}
             </tbody>
           </table>
+          {filteredCertificates.length === 0 && (
+            <div className="p-8 text-center text-gray-500">
+              {certificates.length === 0 ? "No certificates found." : "No certificates found matching your criteria."}
+            </div>
+          )}
         </div>
       </div>
 

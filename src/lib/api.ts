@@ -305,10 +305,10 @@ export const adminApi = {
   },
 
   // Certificate Management
-  async getCertificates(filters: { page?: number; limit?: number; status?: string; provider_id?: number } = {}) {
+  async getCertificates(filters: { page?: number; limit?: number; status?: string; provider_id?: number; search?: string } = {}) {
     const params = new URLSearchParams();
     Object.entries(filters).forEach(([key, value]) => {
-      if (value !== undefined) params.append(key, String(value));
+      if (value !== undefined && value !== '') params.append(key, String(value));
     });
     
     const response = await fetch(`${API_BASE_URL}/api/admin/certificates?${params}`, {

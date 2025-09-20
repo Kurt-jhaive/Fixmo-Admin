@@ -36,14 +36,6 @@ export function RecentActivities() {
 
   return (
     <div className="space-y-6">
-      {/* Welcome Message */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-xl font-semibold text-gray-900 mb-2">Welcome to Fixmo Admin Dashboard</h2>
-        <p className="text-gray-600">
-          Manage your platform efficiently with these quick actions. Monitor users, review service providers, 
-          and oversee certificate management all from one place.
-        </p>
-      </div>
 
       {/* Quick Actions */}
       <div className="bg-white rounded-lg shadow p-6">

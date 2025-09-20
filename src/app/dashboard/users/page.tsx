@@ -236,6 +236,35 @@ export default function UsersPage() {
     }
   };
 
+  // Filter users based on search and filter criteria
+  const filteredUsers = users.filter(user => {
+    // Search filter
+    if (filters.search) {
+      const searchLower = filters.search.toLowerCase();
+      const matchesSearch = 
+        (user.first_name && user.first_name.toLowerCase().includes(searchLower)) ||
+        (user.last_name && user.last_name.toLowerCase().includes(searchLower)) ||
+        (user.email && user.email.toLowerCase().includes(searchLower)) ||
+        (user.userName && user.userName.toLowerCase().includes(searchLower)) ||
+        (user.phone_number && user.phone_number.includes(searchLower)) ||
+        (user.user_location && user.user_location.toLowerCase().includes(searchLower));
+      
+      if (!matchesSearch) return false;
+    }
+    
+    // Verification status filter
+    if (filters.verified !== undefined && user.is_verified !== filters.verified) {
+      return false;
+    }
+    
+    // Active status filter
+    if (filters.active !== undefined && user.is_activated !== filters.active) {
+      return false;
+    }
+    
+    return true;
+  });
+
   return (
     <div className="space-y-6 p-6">
       {/* Page Header */}
@@ -246,9 +275,15 @@ export default function UsersPage() {
               <h1 className="text-3xl font-bold text-gray-900">User Management</h1>
               <p className="text-gray-600 mt-1">Manage customer accounts and verification status</p>
             </div>
-            <div className="bg-blue-50 px-4 py-2 rounded-lg border border-blue-200">
-              <span className="text-sm text-blue-700">Total Users: </span>
-              <span className="font-semibold text-blue-900">{users.length}</span>
+            <div className="flex items-center space-x-4">
+              <div className="bg-blue-50 px-4 py-2 rounded-lg border border-blue-200">
+                <span className="text-sm text-blue-700">Total Users: </span>
+                <span className="font-semibold text-blue-900">{users.length}</span>
+              </div>
+              <div className="bg-green-50 px-4 py-2 rounded-lg border border-green-200">
+                <span className="text-sm text-green-700">Filtered: </span>
+                <span className="font-semibold text-green-900">{filteredUsers.length}</span>
+              </div>
             </div>
           </div>
         </div>
@@ -321,7 +356,7 @@ export default function UsersPage() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {users.map((user) => (
+                {filteredUsers.map((user) => (
                   <tr key={user.user_id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
@@ -412,9 +447,9 @@ export default function UsersPage() {
           </div>
         )}
 
-        {!loading && users.length === 0 && (
+        {!loading && filteredUsers.length === 0 && (
           <div className="p-8 text-center text-gray-500">
-            No users found matching your criteria.
+            {users.length === 0 ? "No users found." : "No users found matching your criteria."}
           </div>
         )}
       </div>

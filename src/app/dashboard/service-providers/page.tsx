@@ -57,15 +57,32 @@ export default function ServiceProvidersPage() {
 
   useEffect(() => {
     fetchProviders();
-  }, []);
+  }, [searchTerm, filterStatus]);
 
   const fetchProviders = async () => {
     try {
       setLoading(true);
       
+      // Prepare filters for API call
+      const filters: any = {};
+      if (searchTerm.trim()) {
+        filters.search = searchTerm.trim();
+      }
+      if (filterStatus !== 'all') {
+        if (filterStatus === 'verified') {
+          filters.verified = true;
+        } else if (filterStatus === 'pending') {
+          filters.verified = false;
+          filters.active = true;
+        } else if (filterStatus === 'rejected') {
+          filters.verified = false;
+          filters.active = false;
+        }
+      }
+      
       // Skip connection test and try real API directly
-      console.log('🚀 Fetching service providers from real API...');
-      const data = await adminApi.getProviders();
+      console.log('🚀 Fetching service providers from real API with filters:', filters);
+      const data = await adminApi.getProviders(filters);
       console.log('✅ Service Providers API Response:', data);
       
       setBackendStatus('connected');
@@ -201,24 +218,42 @@ export default function ServiceProvidersPage() {
     }
   };
 
-  const filteredProviders = providers.filter(provider => {
-    const fullName = `${provider.provider_first_name} ${provider.provider_last_name}`;
-    const matchesSearch = fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         provider.provider_email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         provider.provider_uli.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesFilter = filterStatus === 'all' || 
-                         (filterStatus === 'verified' && provider.provider_isVerified) ||
-                         (filterStatus === 'pending' && !provider.provider_isVerified && provider.provider_isActivated) ||
-                         (filterStatus === 'rejected' && !provider.provider_isVerified && !provider.provider_isActivated);
-    
-    return matchesSearch && matchesFilter;
-  });
-
   const viewProviderDetails = (provider: ServiceProvider) => {
     setSelectedProvider(provider);
     setShowModal(true);
   };
+
+  // Filter providers based on search term and status
+  const filteredProviders = providers.filter(provider => {
+    // Search filter
+    if (searchTerm.trim()) {
+      const searchLower = searchTerm.toLowerCase();
+      const fullName = `${provider.provider_first_name || ''} ${provider.provider_last_name || ''}`.toLowerCase();
+      const matchesSearch = 
+        fullName.includes(searchLower) ||
+        (provider.provider_email && provider.provider_email.toLowerCase().includes(searchLower)) ||
+        (provider.provider_location && provider.provider_location.toLowerCase().includes(searchLower)) ||
+        (provider.provider_uli && provider.provider_uli.toLowerCase().includes(searchLower)) ||
+        (provider.provider_userName && provider.provider_userName.toLowerCase().includes(searchLower));
+      
+      if (!matchesSearch) return false;
+    }
+    
+    // Status filter
+    if (filterStatus !== 'all') {
+      if (filterStatus === 'verified' && !provider.provider_isVerified) {
+        return false;
+      }
+      if (filterStatus === 'pending' && (provider.provider_isVerified || !provider.provider_isActivated)) {
+        return false;
+      }
+      if (filterStatus === 'rejected' && (provider.provider_isVerified || provider.provider_isActivated)) {
+        return false;
+      }
+    }
+    
+    return true;
+  });
 
   if (loading) {
     return (
@@ -242,6 +277,10 @@ export default function ServiceProvidersPage() {
               <div className="bg-blue-50 px-4 py-2 rounded-lg border border-blue-200">
                 <span className="text-sm text-blue-700">Total Providers: </span>
                 <span className="font-semibold text-blue-900">{providers.length}</span>
+              </div>
+              <div className="bg-green-50 px-4 py-2 rounded-lg border border-green-200">
+                <span className="text-sm text-green-700">Filtered: </span>
+                <span className="font-semibold text-green-900">{filteredProviders.length}</span>
               </div>
               
               {/* Backend Status Indicator */}
@@ -422,6 +461,11 @@ export default function ServiceProvidersPage() {
               })}
             </tbody>
           </table>
+          {filteredProviders.length === 0 && (
+            <div className="p-8 text-center text-gray-500">
+              {providers.length === 0 ? "No service providers found." : "No service providers found matching your criteria."}
+            </div>
+          )}
         </div>
       </div>
 
@@ -632,7 +676,7 @@ export default function ServiceProvidersPage() {
         </div>
       )}
 
-      {filteredProviders.length === 0 && !loading && (
+      {providers.length === 0 && !loading && (
         <div className="text-center py-12">
           <div className="text-gray-500">
             <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
