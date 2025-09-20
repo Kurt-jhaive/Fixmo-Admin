@@ -260,19 +260,12 @@ export default function AdminsPage() {
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Admin Management</h1>
           <p className="text-gray-600 mt-2">
-            Manage regular administrator accounts and their access permissions.
+            Manage administrator accounts.
           </p>
           <p className="text-sm text-gray-500 mt-1">
-            Super administrators are not shown in this table for security purposes.
+            Note: Super Admins have full access and cannot be modified here.
           </p>
         </div>
-        <button
-          onClick={() => setShowAddAdminModal(true)}
-          className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 font-bold shadow-lg border-2 border-blue-600 hover:border-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200"
-          style={{ color: '#ffffff !important', backgroundColor: '#2563eb !important' }}
-        >
-          ➕ Add New Admin
-        </button>
       </div>
 
       {/* Error Display */}
