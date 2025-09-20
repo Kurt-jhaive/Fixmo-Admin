@@ -2,7 +2,40 @@
 
 import { useState, useEffect } from "react";
 import { adminApi, type Certificate } from "@/lib/api";
-import { getImageUrl, isValidImageUrl } from "@/lib/image-utils";
+import { getImageUrl } from "@/lib/image-utils";
+import type { ReasonsData } from "@/types/reasons";
+
+// Import reasons data directly
+const reasonsData: ReasonsData = {
+  "verificationRejection": [
+    "Uploaded ID is blurry or unreadable",
+    "Name on ID does not match account name",
+    "Expired or invalid government ID",
+    "Incomplete or inconsistent profile details",
+    "Location/address cannot be verified",
+    "Suspected fake or tampered ID",
+    "Duplicate or multiple accounts using the same ID",
+    "Suspicious or fraudulent activity detected"
+  ],
+  "certificateRejection": [
+    "Certificate is expired",
+    "Certificate image is unclear or low quality",
+    "Certificate does not match the claimed service category",
+    "Issuing authority not recognized or not accredited",
+    "Certificate appears forged or altered",
+    "Missing critical details (e.g., name, date, signature)",
+    "Credentials are insufficient to allow service creation"
+  ],
+  "deactivationReasons": [
+    "Multiple unresolved complaints from other users",
+    "Repeated violation of platform policies",
+    "Fraudulent or suspicious transactions",
+    "Harassment or abusive behavior",
+    "Consistently poor service ratings or feedback",
+    "Failure to fulfill confirmed appointments",
+    "Providing false or misleading information during verification"
+  ]
+};
 
 interface CertificateWithProvider extends Certificate {
   provider_name: string;
@@ -11,7 +44,6 @@ interface CertificateWithProvider extends Certificate {
   verified_by?: string;
   verification_date?: string;
   rejection_reason?: string;
-  certificate_file_path?: string;
 }
 
 const getStatusBadge = (status: string) => {
@@ -45,6 +77,7 @@ export default function CertificatesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState("all");
+  const [searchTerm, setSearchTerm] = useState("");
   const [selectedCertificate, setSelectedCertificate] = useState<{
     id: number;
     providerName: string;
@@ -52,16 +85,28 @@ export default function CertificatesPage() {
     status: string;
   } | null>(null);
   const [rejectionReason, setRejectionReason] = useState("");
+  const [customReason, setCustomReason] = useState("");
+  const [showCustomReason, setShowCustomReason] = useState(false);
 
   useEffect(() => {
     fetchCertificates();
-  }, []);
+  }, [filter, searchTerm]);
 
   const fetchCertificates = async () => {
     try {
       setLoading(true);
       setError(null);
-      const data = await adminApi.getCertificates();
+      
+      // Prepare filters for API call
+      const filters: any = {};
+      if (filter !== "all") {
+        filters.status = filter;
+      }
+      if (searchTerm.trim()) {
+        filters.search = searchTerm.trim();
+      }
+      
+      const data = await adminApi.getCertificates(filters);
       setCertificates(data.certificates || data || []);
     } catch (err) {
       console.error('Error fetching certificates:', err);
@@ -102,14 +147,6 @@ export default function CertificatesPage() {
     }
   };
 
-  const filteredCertificates = certificates.filter(cert => {
-    if (filter === "all") return true;
-    if (filter === "pending") return cert.certificate_status === "pending";
-    if (filter === "expiring") return isExpiringSoon(cert.expiry_date);
-    if (filter === "expired") return cert.certificate_status === "expired";
-    return true;
-  });
-
   const handleCertificateAction = async (certId: number, action: "approve" | "reject", reason?: string) => {
     try {
       if (action === "approve") {
@@ -121,6 +158,8 @@ export default function CertificatesPage() {
       await fetchCertificates();
       setSelectedCertificate(null);
       setRejectionReason("");
+      setCustomReason("");
+      setShowCustomReason(false);
     } catch (error) {
       console.error(`Error ${action}ing certificate:`, error);
       alert(`Failed to ${action} certificate. Please try again.`);
@@ -129,7 +168,7 @@ export default function CertificatesPage() {
 
   const handleViewDocument = (certificate: CertificateWithProvider) => {
     // Check for certificate_file_path first, then fallback to certificate_photo
-    const documentPath = certificate.certificate_file_path || certificate.certificate_photo;
+    const documentPath = certificate.certificate_file_path;;
     
     if (documentPath) {
       const documentUrl = getImageUrl(documentPath);
@@ -147,6 +186,40 @@ export default function CertificatesPage() {
     }
   };
 
+  // Filter certificates based on search term and filter
+  const filteredCertificates = certificates.filter(certificate => {
+    // Search filter
+    if (searchTerm.trim()) {
+      const searchLower = searchTerm.toLowerCase();
+      const matchesSearch = 
+        (certificate.provider_name && certificate.provider_name.toLowerCase().includes(searchLower)) ||
+        (certificate.certificate_name && certificate.certificate_name.toLowerCase().includes(searchLower)) ||
+        (certificate.certificate_type && certificate.certificate_type.toLowerCase().includes(searchLower)) ||
+        (certificate.certificate_status && certificate.certificate_status.toLowerCase().includes(searchLower)) ||
+        (certificate.certificate_number && certificate.certificate_number.toLowerCase().includes(searchLower));
+      
+      if (!matchesSearch) return false;
+    }
+    
+    // Status filter
+    if (filter !== 'all') {
+      if (filter === 'pending' && certificate.certificate_status !== 'pending') {
+        return false;
+      }
+      if (filter === 'approved' && !['approved', 'valid'].includes(certificate.certificate_status)) {
+        return false;
+      }
+      if (filter === 'expired' && certificate.certificate_status !== 'expired') {
+        return false;
+      }
+      if (filter === 'expiring' && !isExpiringSoon(certificate.expiry_date)) {
+        return false;
+      }
+    }
+    
+    return true;
+  });
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -159,10 +232,14 @@ export default function CertificatesPage() {
       </div>
 
       {/* Quick Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
           <div className="text-sm font-medium text-gray-600">Total Certificates</div>
           <div className="text-2xl font-bold text-gray-900">{certificates.length}</div>
+        </div>
+        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+          <div className="text-sm font-medium text-gray-600">Filtered Results</div>
+          <div className="text-2xl font-bold text-blue-600">{filteredCertificates.length}</div>
         </div>
         <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
           <div className="text-sm font-medium text-gray-600">Pending Review</div>
@@ -184,20 +261,40 @@ export default function CertificatesPage() {
         </div>
       </div>
 
-      {/* Filters */}
+      {/* Search and Filters */}
       <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-        <div className="flex items-center space-x-4">
-          <span className="text-sm font-medium text-gray-700">Filter by:</span>
-          <select
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-            className="border border-gray-300 rounded-md px-3 py-1 text-sm"
-          >
-            <option value="all">All Certificates</option>
-            <option value="pending">Pending Review</option>
-            <option value="expiring">Expiring Soon</option>
-            <option value="expired">Expired</option>
-          </select>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+          <div>
+            <input
+              type="text"
+              placeholder="Search by provider name, certificate type, or status..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm text-gray-900 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            />
+          </div>
+          <div className="flex items-center space-x-2">
+            <span className="text-sm font-medium text-gray-700">Filter by:</span>
+            <select
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              className="border border-gray-300 rounded-md px-3 py-2 text-sm text-gray-900 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            >
+              <option value="all">All Certificates</option>
+              <option value="pending">Pending Review</option>
+              <option value="expiring">Expiring Soon</option>
+              <option value="expired">Expired</option>
+              <option value="approved">Approved</option>
+            </select>
+          </div>
+          <div>
+            <button
+              onClick={fetchCertificates}
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              Refresh
+            </button>
+          </div>
         </div>
       </div>
 
@@ -262,16 +359,20 @@ export default function CertificatesPage() {
                     )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <div className="flex space-x-2">
-                      {(certificate.certificate_file_path || certificate.certificate_photo) ? (
+                    <div className="flex flex-wrap gap-2">
+                      {(certificate.certificate_file_path) ? (
                         <button 
                           onClick={() => handleViewDocument(certificate)}
-                          className="text-blue-600 hover:text-blue-900"
+                          className="inline-flex items-center px-3 py-1.5 border border-blue-300 text-xs font-medium rounded-md text-blue-700 bg-blue-50 hover:bg-blue-100 hover:border-blue-400 transition-colors"
                         >
+                          <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                          </svg>
                           View Document
                         </button>
                       ) : (
-                        <span className="text-gray-400 cursor-not-allowed">
+                        <span className="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md text-gray-500 bg-gray-100">
                           No Document
                         </span>
                       )}
@@ -279,8 +380,11 @@ export default function CertificatesPage() {
                         <>
                           <button
                             onClick={() => handleCertificateAction(certificate.certificate_id, "approve")}
-                            className="bg-green-100 text-green-700 px-3 py-1 rounded text-sm hover:bg-green-200"
+                            className="inline-flex items-center px-3 py-1.5 border border-green-300 text-xs font-medium rounded-md text-green-700 bg-green-50 hover:bg-green-100 hover:border-green-400 transition-colors"
                           >
+                            <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
                             Approve
                           </button>
                           <button
@@ -290,8 +394,11 @@ export default function CertificatesPage() {
                               certificateType: certificate.certificate_name,
                               status: certificate.certificate_status
                             })}
-                            className="bg-red-100 text-red-700 px-3 py-1 rounded text-sm hover:bg-red-200"
+                            className="inline-flex items-center px-3 py-1.5 border border-red-300 text-xs font-medium rounded-md text-red-700 bg-red-50 hover:bg-red-100 hover:border-red-400 transition-colors"
                           >
+                            <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
                             Reject
                           </button>
                         </>
@@ -302,38 +409,103 @@ export default function CertificatesPage() {
               ))}
             </tbody>
           </table>
+          {filteredCertificates.length === 0 && (
+            <div className="p-8 text-center text-gray-500">
+              {certificates.length === 0 ? "No certificates found." : "No certificates found matching your criteria."}
+            </div>
+          )}
         </div>
       </div>
 
       {/* Rejection Modal */}
       {selectedCertificate && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg max-w-md w-full mx-4">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Reject Certificate</h3>
-            <p className="text-sm text-gray-600 mb-4">
-              Please provide a reason for rejecting {selectedCertificate.providerName}&apos;s certificate:
-            </p>
-            <textarea
-              value={rejectionReason}
-              onChange={(e) => setRejectionReason(e.target.value)}
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
-              rows={3}
-              placeholder="Enter rejection reason..."
-            />
-            <div className="flex justify-end space-x-3 mt-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-xl">
+            {/* Modal Header */}
+            <div className="bg-gradient-to-r from-red-600 to-red-700 px-6 py-4 rounded-t-lg">
+              <h3 className="text-lg font-semibold text-white flex items-center">
+                <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+                Reject Certificate
+              </h3>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-6">
+              <div className="text-sm text-gray-600">
+                <p className="mb-2">
+                  <span className="font-medium">Provider:</span> {selectedCertificate.providerName}
+                </p>
+                <p className="mb-4">
+                  <span className="font-medium">Certificate:</span> {selectedCertificate.certificateType}
+                </p>
+                <p>Please provide a reason for rejecting this certificate:</p>
+              </div>
+              
+              {/* Predefined Reasons Dropdown */}
+              <div>
+                <label className="block text-sm font-medium text-gray-900 mb-2">
+                  Select Reason
+                </label>
+                <select
+                  value={rejectionReason}
+                  onChange={(e) => {
+                    setRejectionReason(e.target.value);
+                    setShowCustomReason(e.target.value === "custom");
+                    if (e.target.value !== "custom") {
+                      setCustomReason("");
+                    }
+                  }}
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 text-gray-900 bg-white"
+                >
+                  <option value="">Select a reason...</option>
+                  {reasonsData.certificateRejection.map((reason: string, index: number) => (
+                    <option key={index} value={reason}>
+                      {reason}
+                    </option>
+                  ))}
+                  <option value="custom">Other (Custom Reason)</option>
+                </select>
+              </div>
+
+              {/* Custom Reason Input */}
+              {showCustomReason && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-900 mb-2">
+                    Custom Reason
+                  </label>
+                  <textarea
+                    value={customReason}
+                    onChange={(e) => setCustomReason(e.target.value)}
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                    rows={3}
+                    placeholder="Enter custom rejection reason..."
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-6 py-4 bg-gray-50 rounded-b-lg flex justify-end space-x-3">
               <button
                 onClick={() => {
                   setSelectedCertificate(null);
                   setRejectionReason("");
+                  setCustomReason("");
+                  setShowCustomReason(false);
                 }}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
               >
                 Cancel
               </button>
               <button
-                onClick={() => handleCertificateAction(selectedCertificate.id, "reject", rejectionReason)}
-                disabled={!rejectionReason.trim()}
-                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 disabled:bg-red-400"
+                onClick={() => {
+                  const finalReason = showCustomReason ? customReason : rejectionReason;
+                  handleCertificateAction(selectedCertificate.id, "reject", finalReason);
+                }}
+                disabled={!rejectionReason || (showCustomReason && !customReason.trim())}
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 disabled:bg-red-400 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
               >
                 Reject Certificate
               </button>
