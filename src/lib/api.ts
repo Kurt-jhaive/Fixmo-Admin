@@ -588,6 +588,7 @@ export interface User {
   user_location?: string;
   created_at: string;
   is_verified: boolean;
+  verification_status?: string;
   userName: string;
   is_activated: boolean;
   birthday?: string;
@@ -603,6 +604,7 @@ export interface ServiceProvider {
   provider_profile_photo?: string;
   provider_valid_id?: string;
   provider_isVerified: boolean;
+  verification_status?: string;
   created_at: string;
   provider_rating: number;
   provider_location?: string;
@@ -642,3 +644,223 @@ export interface Admin {
   created_at: string;
   last_login?: string;
 }
+
+// Appointment interfaces
+export interface Appointment {
+  appointment_id: number;
+  customer_id: number;
+  provider_id: number;
+  appointment_status: string;
+  scheduled_date: string;
+  created_at: string;
+  final_price: number;
+  repairDescription: string;
+  warranty_days: number;
+  finished_at: string | null;
+  completed_at: string | null;
+  warranty_expires_at: string | null;
+  warranty_paused_at: string | null;
+  warranty_remaining_days: number | null;
+  cancellation_reason: string | null;
+  days_left: number | null;
+  customer: {
+    user_id: number;
+    first_name: string;
+    last_name: string;
+    email: string;
+    phone_number: string;
+  };
+  serviceProvider: {
+    provider_id: number;
+    provider_first_name: string;
+    provider_last_name: string;
+    provider_email: string;
+    provider_phone_number: string;
+    provider_rating: number;
+  };
+  service: {
+    service_title: string;
+    service_startingprice: number;
+  };
+}
+
+export interface BackjobApplication {
+  backjob_id: number;
+  appointment_id: number;
+  customer_id: number;
+  provider_id: number;
+  status: string;
+  reason: string;
+  evidence: any;
+  provider_dispute_reason: string | null;
+  provider_dispute_evidence: any;
+  admin_notes: string | null;
+  created_at: string;
+  updated_at: string;
+  appointment: Appointment;
+  customer: {
+    user_id: number;
+    first_name: string;
+    last_name: string;
+    email: string;
+  };
+  provider: {
+    provider_id: number;
+    provider_first_name: string;
+    provider_last_name: string;
+    provider_email: string;
+  };
+}
+
+export interface AppointmentFilters {
+  page?: number;
+  limit?: number;
+  status?: string;
+  provider_id?: number;
+  customer_id?: number;
+  from_date?: string;
+  to_date?: string;
+  sort_by?: string;
+  sort_order?: 'asc' | 'desc';
+}
+
+export interface BackjobFilters {
+  status?: string;
+  page?: number;
+  limit?: number;
+}
+
+export interface AdminCancelRequest {
+  cancellation_reason: string;
+  admin_notes?: string;
+  cancelled_by: string;
+  penalty_applied?: boolean;
+}
+
+export interface BackjobUpdateRequest {
+  action: 'approve' | 'cancel-by-admin' | 'cancel-by-user';
+  admin_notes: string;
+}
+
+// Appointments API
+export const appointmentsApi = {
+  async getAll(filters: AppointmentFilters = {}): Promise<any> {
+    const queryParams = new URLSearchParams();
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        queryParams.append(key, String(value));
+      }
+    });
+
+    const response = await authenticatedFetch(
+      `${API_BASE_URL}/api/appointments?${queryParams.toString()}`
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to fetch appointments');
+    }
+
+    return response.json();
+  },
+
+  async getById(appointmentId: number): Promise<any> {
+    const response = await authenticatedFetch(
+      `${API_BASE_URL}/api/appointments/${appointmentId}`
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to fetch appointment');
+    }
+
+    return response.json();
+  },
+
+  async adminCancel(appointmentId: number, data: AdminCancelRequest): Promise<any> {
+    const response = await authenticatedFetch(
+      `${API_BASE_URL}/api/appointments/${appointmentId}/admin-cancel`,
+      {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to cancel appointment');
+    }
+
+    return response.json();
+  },
+
+  async getBackjobs(filters: BackjobFilters = {}): Promise<any> {
+    try {
+      const queryParams = new URLSearchParams();
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          queryParams.append(key, String(value));
+        }
+      });
+
+      // Use the exact endpoint from the API documentation
+      const url = `${API_BASE_URL}/api/appointments/backjobs${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
+      console.log('Fetching backjobs from:', url);
+      console.log('Query params:', Object.fromEntries(queryParams));
+
+      const response = await authenticatedFetch(url);
+
+      console.log('Response status:', response.status);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Error response:', errorText);
+        let error;
+        try {
+          error = JSON.parse(errorText);
+        } catch {
+          error = { message: errorText || 'Failed to fetch backjobs' };
+        }
+        throw new Error(error.message || `HTTP ${response.status}: Failed to fetch backjobs`);
+      }
+
+      const data = await response.json();
+      console.log('Backjobs data received:', data);
+      return data;
+    } catch (error) {
+      console.error('Error in getBackjobs:', error);
+      throw error;
+    }
+  },
+
+  async updateBackjob(backjobId: number, data: BackjobUpdateRequest): Promise<any> {
+    const response = await authenticatedFetch(
+      `${API_BASE_URL}/api/appointments/backjobs/${backjobId}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to update backjob');
+    }
+
+    return response.json();
+  },
+
+  async getStats(): Promise<any> {
+    const response = await authenticatedFetch(
+      `${API_BASE_URL}/api/appointments/stats`
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to fetch appointment stats');
+    }
+
+    return response.json();
+  },
+};
+

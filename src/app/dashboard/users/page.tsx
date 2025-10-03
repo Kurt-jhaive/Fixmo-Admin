@@ -418,7 +418,7 @@ export default function UsersPage() {
                       >
                         View
                       </button>
-                      {!user.is_verified && (
+                      {!user.is_verified && user.verification_status !== 'rejected' && (
                         <>
                           <button
                             onClick={() => handleVerifyUser(user.user_id)}
