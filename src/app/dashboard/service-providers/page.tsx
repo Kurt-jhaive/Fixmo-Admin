@@ -430,8 +430,8 @@ export default function ServiceProvidersPage() {
                     >
                       View
                     </button>
-                    {/* Show Approve/Reject only for unverified (pending) providers */}
-                    {!provider.provider_isVerified && (
+                    {/* Show Approve/Reject only for unverified (pending) providers, but not for rejected */}
+                    {!provider.provider_isVerified && provider.verification_status !== 'rejected' && (
                       <>
                         <button
                           onClick={() => handleVerifyProvider(provider.provider_id.toString())}
@@ -447,8 +447,8 @@ export default function ServiceProvidersPage() {
                         </button>
                       </>
                     )}
-                    {/* Show Activate/Deactivate only for verified (approved) providers */}
-                    {provider.provider_isVerified && (
+                    {/* Show Activate/Deactivate for verified (approved) providers OR rejected providers */}
+                    {(provider.provider_isVerified || provider.verification_status === 'rejected') && (
                       <button
                         onClick={() => handleStatusChange(provider.provider_id.toString(), provider.provider_isActivated ? 'inactive' : 'active')}
                         className={`font-medium ${provider.provider_isActivated ? "text-red-600 hover:text-red-900" : "text-green-600 hover:text-green-900"}`}

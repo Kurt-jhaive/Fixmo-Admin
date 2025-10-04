@@ -31,6 +31,12 @@ const menuItems = [
     roles: ["admin", "super_admin"], // Both roles can access
   },
   {
+    href: "/dashboard/appointments",
+    label: "Appointments",
+    icon: "📅",
+    roles: ["admin", "super_admin"], // Both roles can access
+  },
+  {
     href: "/dashboard/admins",
     label: "Admin Management",
     icon: "👨‍💼",
