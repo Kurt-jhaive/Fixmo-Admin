@@ -4,8 +4,17 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { authApi } from '@/lib/api';
 
+interface User {
+  id: number;
+  username: string;
+  email: string;
+  name: string;
+  role: 'admin' | 'super_admin';
+  is_active: boolean;
+}
+
 export function Header() {
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [currentTime, setCurrentTime] = useState<string>('');
   const router = useRouter();
@@ -34,18 +43,28 @@ export function Header() {
   }, []);
 
   const handleLogout = async () => {
+    console.log('Logout: Starting logout process...');
+    setShowUserMenu(false); // Close the menu immediately
+    
     try {
-      await authApi.logout();
-      // Clear local user state
+      // Clear local user state immediately
       setUser(null);
-      router.push('/login');
+      
+      // Clear auth data
+      authApi.clearAuth();
+      
+      // Call logout API (optional, don't wait for it)
+      authApi.logout().catch(err => console.error('Logout API error:', err));
+      
+      console.log('Logout: Redirecting to login...');
+      // Force redirect to login
+      router.replace('/login');
     } catch (error) {
       console.error('Logout error:', error);
-      // Even if API call fails, still logout locally
-      authApi.clearAuth();
-      // Clear local user state
+      // Even if anything fails, still logout locally
       setUser(null);
-      router.push('/login');
+      authApi.clearAuth();
+      router.replace('/login');
     }
   };
 
@@ -99,7 +118,7 @@ export function Header() {
                 </span>
               </div>
               <div className="text-sm text-left">
-                <div className="font-medium text-gray-900">{user?.email || 'admin@fixmo.com'}</div>
+                <div className="font-medium text-gray-900">{user?.email || 'Loading...'}</div>
               </div>
               <svg className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${showUserMenu ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />

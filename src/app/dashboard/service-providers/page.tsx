@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { adminApi, ServiceProvider } from '@/lib/api';
 import { SmartImage } from '@/components/SmartImage';
 import { getImageUrl } from '@/lib/image-utils';
@@ -56,16 +56,12 @@ export default function ServiceProvidersPage() {
   const [customReason, setCustomReason] = useState("");
   const [showCustomReason, setShowCustomReason] = useState(false);
 
-  useEffect(() => {
-    fetchProviders();
-  }, [searchTerm, filterStatus]);
-
-  const fetchProviders = async () => {
+  const fetchProviders = useCallback(async () => {
     try {
       setLoading(true);
       
       // Prepare filters for API call
-      const filters: any = {};
+      const filters: Record<string, string | boolean> = {};
       if (searchTerm.trim()) {
         filters.search = searchTerm.trim();
       }
@@ -137,7 +133,11 @@ export default function ServiceProvidersPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [searchTerm, filterStatus]);
+
+  useEffect(() => {
+    fetchProviders();
+  }, [fetchProviders]);
 
   const handleVerifyProvider = async (providerId: string) => {
     try {

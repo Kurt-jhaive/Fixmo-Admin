@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { adminApi, Admin, authApi } from "@/lib/api";
 
@@ -20,7 +20,7 @@ const getStatusBadge = (status: boolean) => {
 
 export default function AdminsPage() {
   const router = useRouter();
-  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [currentUser, setCurrentUser] = useState<Admin | null>(null);
 
   // Check authentication and role authorization
   useEffect(() => {
@@ -60,17 +60,21 @@ export default function AdminsPage() {
     role: "admin" as "admin" | "super_admin",
   });
 
-  useEffect(() => {
-    // Get current user info
-    const user = authApi.getStoredUser();
-    console.log('Current user from storage:', user); // Debug log
-    if (user) {
-      setCurrentUser(user as Admin);
-    }
-    fetchAdmins();
+  const normalizeAdmin = useCallback((adminData: Record<string, unknown>): Admin => {
+    return {
+      id: (adminData.admin_id as number) || (adminData.id as number) || 0,
+      username: (adminData.admin_username as string) || (adminData.username as string) || '',
+      email: (adminData.admin_email as string) || (adminData.email as string) || '',
+      name: (adminData.admin_name as string) || (adminData.name as string) || '',
+      role: (adminData.admin_role as 'admin' | 'super_admin') || (adminData.role as 'admin' | 'super_admin') || 'admin',
+      is_active: adminData.is_active !== undefined ? (adminData.is_active as boolean) : true,
+      must_change_password: (adminData.must_change_password as boolean) || false,
+      created_at: (adminData.created_at as string) || new Date().toISOString(),
+      last_login: adminData.last_login as string | undefined
+    };
   }, []);
 
-  const fetchAdmins = async () => {
+  const fetchAdmins = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -95,20 +99,31 @@ export default function AdminsPage() {
       
       // Filter out any invalid admin objects and normalize them
       adminsList = adminsList
-        .filter((admin: any) => admin && typeof admin === 'object')
-        .map((admin: any) => normalizeAdmin(admin))
+        .filter((admin: unknown): admin is Record<string, unknown> => admin !== null && typeof admin === 'object')
+        .map((admin: Record<string, unknown>) => normalizeAdmin(admin))
         .filter((admin: Admin) => admin.role !== 'super_admin'); // Hide super admins from table
       
       setAdmins(adminsList);
       console.log('Final admins list:', adminsList);
-    } catch (err: any) {
-      setError(err.message || 'Failed to fetch admins');
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch admins';
+      setError(errorMessage);
       console.error('Error fetching admins:', err);
       setAdmins([]); // Ensure we set an empty array on error
     } finally {
       setLoading(false);
     }
-  };
+  }, [normalizeAdmin]);
+
+  useEffect(() => {
+    // Get current user info
+    const user = authApi.getStoredUser();
+    console.log('Current user from storage:', user); // Debug log
+    if (user) {
+      setCurrentUser(user as Admin);
+    }
+    fetchAdmins();
+  }, [fetchAdmins]);
 
   const handleAddAdmin = async () => {
     if (!newAdmin.name.trim() || !newAdmin.email.trim()) {
@@ -127,8 +142,9 @@ export default function AdminsPage() {
       
       // Clear success message after 5 seconds
       setTimeout(() => setSuccess(null), 5000);
-    } catch (err: any) {
-      setError(err.message || 'Failed to invite admin');
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to invite admin';
+      setError(errorMessage);
       console.error('Error inviting admin:', err);
     } finally {
       setActionLoading(false);
@@ -154,26 +170,6 @@ export default function AdminsPage() {
     return role === 'super_admin' ? 'Super Admin' : 'Admin';
   };
 
-  const normalizeAdmin = (adminData: any): Admin => {
-    return {
-      id: adminData.admin_id || adminData.id || 0,
-      username: adminData.admin_username || adminData.username || '',
-      email: adminData.admin_email || adminData.email || '',
-      name: adminData.admin_name || adminData.name || '',
-      role: adminData.admin_role || adminData.role || 'admin',
-      is_active: adminData.is_active !== undefined ? adminData.is_active : true,
-      must_change_password: adminData.must_change_password || false,
-      created_at: adminData.created_at || new Date().toISOString(),
-      last_login: adminData.last_login
-    };
-  };
-
-  const canManageAdmin = (admin: Admin) => {
-    // Since we filter out super admins from the table, all shown admins can be managed
-    // Super admin can manage all regular admins
-    return currentUser?.role === 'super_admin' && admin?.id;
-  };
-
   const handleResetPassword = (admin: Admin) => {
     setSelectedAdmin(admin);
     setResetPasswordReason("");
@@ -186,7 +182,7 @@ export default function AdminsPage() {
     try {
       setActionLoading(true);
       setError(null);
-      const response = await adminApi.resetAdminPassword(selectedAdmin.id, resetPasswordReason);
+      await adminApi.resetAdminPassword(selectedAdmin.id, resetPasswordReason);
       setSuccess(`Password reset successfully for ${selectedAdmin.name}! New credentials sent via email.`);
       await fetchAdmins();
       setShowResetPasswordModal(false);
@@ -195,8 +191,9 @@ export default function AdminsPage() {
       
       // Clear success message after 5 seconds
       setTimeout(() => setSuccess(null), 5000);
-    } catch (err: any) {
-      setError(err.message || 'Failed to reset password');
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to reset password';
+      setError(errorMessage);
       console.error('Error resetting password:', err);
     } finally {
       setActionLoading(false);
@@ -224,8 +221,9 @@ export default function AdminsPage() {
       
       // Clear success message after 3 seconds
       setTimeout(() => setSuccess(null), 3000);
-    } catch (err: any) {
-      setError(err.message || 'Failed to update admin status');
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to update admin status';
+      setError(errorMessage);
       console.error('Error updating admin status:', err);
     } finally {
       setActionLoading(false);

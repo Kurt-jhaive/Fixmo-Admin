@@ -1,42 +1,7 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
-import { isTokenExpired, clearAuthAndRedirect } from './auth-utils';
+import { isTokenExpired } from './auth-utils';
 
 console.log('API_BASE_URL:', API_BASE_URL); // Debug log
-
-// Helper function for authenticated requests
-async function authenticatedFetch(url: string, options: RequestInit = {}): Promise<Response> {
-  const token = localStorage.getItem('token') || localStorage.getItem('adminToken');
-  
-  if (!token || isTokenExpired(token)) {
-    // Clear auth data but don't redirect here - let AuthWrapper handle it
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    localStorage.removeItem('adminToken');
-    localStorage.removeItem('adminUser');
-    throw new Error('Authentication required');
-  }
-
-  const response = await fetch(url, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
-      ...options.headers,
-    },
-  });
-
-  // Handle 401 Unauthorized responses
-  if (response.status === 401) {
-    // Clear auth data but don't redirect here - let AuthWrapper handle it
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    localStorage.removeItem('adminToken');
-    localStorage.removeItem('adminUser');
-    throw new Error('Session expired. Please login again.');
-  }
-
-  return response;
-}
 
 // Authentication interfaces
 export interface LoginRequest {

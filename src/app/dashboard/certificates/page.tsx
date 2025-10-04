@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { adminApi, type Certificate } from "@/lib/api";
 import { getImageUrl } from "@/lib/image-utils";
 import type { ReasonsData } from "@/types/reasons";
@@ -88,17 +88,13 @@ export default function CertificatesPage() {
   const [customReason, setCustomReason] = useState("");
   const [showCustomReason, setShowCustomReason] = useState(false);
 
-  useEffect(() => {
-    fetchCertificates();
-  }, [filter, searchTerm]);
-
-  const fetchCertificates = async () => {
+  const fetchCertificates = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
       
       // Prepare filters for API call
-      const filters: any = {};
+      const filters: Record<string, string> = {};
       if (filter !== "all") {
         filters.status = filter;
       }
@@ -145,7 +141,11 @@ export default function CertificatesPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [filter, searchTerm]);
+
+  useEffect(() => {
+    fetchCertificates();
+  }, [fetchCertificates]);
 
   const handleCertificateAction = async (certId: number, action: "approve" | "reject", reason?: string) => {
     try {

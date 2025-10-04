@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { testBackendConnection, adminApi } from '@/lib/api';
 
 interface SystemMetrics {
@@ -25,7 +25,44 @@ export default function StatusPage() {
   });
   const [loading, setLoading] = useState(true);
 
-  const checkBackend = async () => {
+  const loadSystemMetrics = useCallback(async () => {
+    try {
+      // Load system metrics
+      const [users, providers, certificates] = await Promise.all([
+        adminApi.getUsers().catch(() => []),
+        adminApi.getProviders().catch(() => []),
+        adminApi.getCertificates().catch(() => [])
+      ]);
+
+      interface StatusItem {
+        status?: string;
+        verified?: boolean;
+      }
+
+      const userArray = Array.isArray(users) ? users : (users as { data?: unknown[] })?.data || [];
+      const providerArray = Array.isArray(providers) ? providers : (providers as { data?: unknown[] })?.data || [];
+      const certificateArray = Array.isArray(certificates) ? certificates : (certificates as { data?: unknown[] })?.data || [];
+
+      setMetrics({
+        totalUsers: userArray.length,
+        activeUsers: userArray.filter((u: unknown) => (u as StatusItem).status === 'active').length,
+        totalProviders: providerArray.length,
+        verifiedProviders: providerArray.filter((p: unknown) => (p as StatusItem).verified).length,
+        totalCertificates: certificateArray.length,
+        pendingApprovals: [
+          ...userArray.filter((u: unknown) => (u as StatusItem).status === 'pending'),
+          ...providerArray.filter((p: unknown) => (p as StatusItem).status === 'pending'),
+          ...certificateArray.filter((c: unknown) => (c as StatusItem).status === 'pending')
+        ].length
+      });
+    } catch (error) {
+      console.error('Error loading metrics:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const checkBackend = useCallback(async () => {
     setBackendStatus('checking');
     
     try {
@@ -36,47 +73,15 @@ export default function StatusPage() {
       if (isConnected) {
         await loadSystemMetrics();
       }
-    } catch (err) {
+    } catch {
       setBackendStatus('disconnected');
       setLastChecked(new Date());
     }
-  };
-
-  const loadSystemMetrics = async () => {
-    try {
-      // Load system metrics
-      const [users, providers, certificates] = await Promise.all([
-        adminApi.getUsers().catch(() => []),
-        adminApi.getProviders().catch(() => []),
-        adminApi.getCertificates().catch(() => [])
-      ]);
-
-      const userArray = Array.isArray(users) ? users : users?.data || [];
-      const providerArray = Array.isArray(providers) ? providers : providers?.data || [];
-      const certificateArray = Array.isArray(certificates) ? certificates : certificates?.data || [];
-
-      setMetrics({
-        totalUsers: userArray.length,
-        activeUsers: userArray.filter((u: any) => u.status === 'active').length,
-        totalProviders: providerArray.length,
-        verifiedProviders: providerArray.filter((p: any) => p.verified).length,
-        totalCertificates: certificateArray.length,
-        pendingApprovals: [
-          ...userArray.filter((u: any) => u.status === 'pending'),
-          ...providerArray.filter((p: any) => p.status === 'pending'),
-          ...certificateArray.filter((c: any) => c.status === 'pending')
-        ].length
-      });
-    } catch (error) {
-      console.error('Error loading metrics:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [loadSystemMetrics]);
 
   useEffect(() => {
     checkBackend();
-  }, []);
+  }, [checkBackend]);
 
   const getStatusColor = () => {
     switch (backendStatus) {

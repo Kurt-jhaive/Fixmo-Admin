@@ -3,7 +3,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { adminApi, type User } from "@/lib/api";
 import SmartImage from "@/components/SmartImage";
-import { getImageUrl } from "@/lib/image-utils";
 import type { ReasonsData } from "@/types/reasons";
 
 // Import reasons data directly
@@ -43,7 +42,6 @@ export default function UsersPage() {
   const [loading, setLoading] = useState(true);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [showModal, setShowModal] = useState(false);
-  const [backendStatus, setBackendStatus] = useState<'unknown' | 'connected' | 'disconnected'>('unknown');
   const [filters, setFilters] = useState({
     search: "",
     verified: undefined as boolean | undefined,

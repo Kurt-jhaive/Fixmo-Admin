@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { authApi } from '@/lib/api';
-import { isTokenExpired, clearAuthAndRedirect } from '@/lib/auth-utils';
+import { isTokenExpired } from '@/lib/auth-utils';
 
 interface AuthWrapperProps {
   children: React.ReactNode;
