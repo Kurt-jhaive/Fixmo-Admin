@@ -69,8 +69,8 @@ export function Sidebar() {
   );
 
   return (
-    <div className={`bg-gray-900 text-white transition-all duration-300 ${isCollapsed ? "w-16" : "w-64"}`}>
-      <div className="p-4">
+    <div className={`bg-gray-900 text-white transition-all duration-300 h-screen sticky top-0 flex flex-col ${isCollapsed ? "w-16" : "w-64"}`}>
+      <div className="p-4 flex-shrink-0">
         <div className="flex items-center space-x-2">
           <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center text-white font-bold shadow-lg">
             F
@@ -81,7 +81,7 @@ export function Sidebar() {
         </div>
       </div>
       
-      <nav className="mt-8">
+      <nav className="mt-8 flex-1 overflow-y-auto">
         {accessibleMenuItems.map((item) => (
           <Link
             key={item.href}
@@ -96,7 +96,7 @@ export function Sidebar() {
         ))}
       </nav>
       
-      <div className="absolute bottom-4 left-4">
+      <div className="p-4 flex-shrink-0">
         <button
           onClick={() => setIsCollapsed(!isCollapsed)}
           className="flex items-center justify-center w-8 h-8 bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white rounded-lg transition-all duration-200 shadow-lg border border-gray-700"

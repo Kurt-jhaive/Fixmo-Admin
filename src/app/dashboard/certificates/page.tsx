@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { adminApi, type Certificate } from "@/lib/api";
+import { adminApi, type Certificate, exportApi } from "@/lib/api";
 import { getImageUrl } from "@/lib/image-utils";
 import type { ReasonsData } from "@/types/reasons";
 
@@ -84,9 +84,25 @@ export default function CertificatesPage() {
     certificateType: string;
     status: string;
   } | null>(null);
+  const [approvalConfirm, setApprovalConfirm] = useState<{
+    id: number;
+    providerName: string;
+    certificateType: string;
+  } | null>(null);
   const [rejectionReason, setRejectionReason] = useState("");
   const [customReason, setCustomReason] = useState("");
   const [showCustomReason, setShowCustomReason] = useState(false);
+
+  // Export Modal States
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportFormat, setExportFormat] = useState<'csv' | 'pdf'>('csv');
+  const [exportFilters, setExportFilters] = useState({
+    certificate_status: '',
+    provider_id: '',
+    start_date: '',
+    end_date: ''
+  });
+  const [exporting, setExporting] = useState(false);
 
   const fetchCertificates = useCallback(async () => {
     try {
@@ -151,18 +167,77 @@ export default function CertificatesPage() {
     try {
       if (action === "approve") {
         await adminApi.approveCertificate(certId);
+        alert('Certificate approved successfully!');
       } else if (action === "reject" && reason) {
         await adminApi.rejectCertificate(certId, reason);
+        alert('Certificate rejected successfully!');
       }
       // Refresh the certificates list
       await fetchCertificates();
       setSelectedCertificate(null);
+      setApprovalConfirm(null);
       setRejectionReason("");
       setCustomReason("");
       setShowCustomReason(false);
     } catch (error) {
       console.error(`Error ${action}ing certificate:`, error);
       alert(`Failed to ${action} certificate. Please try again.`);
+    }
+  };
+
+  const handleExport = async () => {
+    if (!exportFormat) {
+      alert('Please select an export format');
+      return;
+    }
+
+    try {
+      setExporting(true);
+
+      // Build export parameters
+      const exportParams: any = {
+        format: exportFormat,
+      };
+
+      // Add filters if they have values
+      if (exportFilters.certificate_status) {
+        exportParams.certificate_status = exportFilters.certificate_status;
+      }
+      if (exportFilters.provider_id) {
+        exportParams.provider_id = exportFilters.provider_id;
+      }
+      if (exportFilters.start_date) {
+        exportParams.start_date = exportFilters.start_date;
+      }
+      if (exportFilters.end_date) {
+        exportParams.end_date = exportFilters.end_date;
+      }
+      if (searchTerm) {
+        exportParams.search = searchTerm;
+      }
+
+      console.log('Exporting certificates with params:', exportParams);
+      
+      // Call the export API
+      const blob = await exportApi.exportCertificates(exportParams);
+      
+      // Create download link
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `certificates-${new Date().toISOString().split('T')[0]}.${exportFormat}`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      setShowExportModal(false);
+      alert('Export completed successfully!');
+    } catch (error) {
+      console.error('Export error:', error);
+      alert('Failed to export certificates. Please try again.');
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -263,7 +338,7 @@ export default function CertificatesPage() {
 
       {/* Search and Filters */}
       <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center">
           <div>
             <input
               type="text"
@@ -290,15 +365,26 @@ export default function CertificatesPage() {
           <div>
             <button
               onClick={fetchCertificates}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               Refresh
+            </button>
+          </div>
+          <div>
+            <button
+              onClick={() => setShowExportModal(true)}
+              className="w-full px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 flex items-center justify-center gap-2"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+              Export
             </button>
           </div>
         </div>
       </div>
 
-      {/* Certificates Table */}
+      {/* Certificates Table */}      {/* Certificates Table */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-200">
           <h2 className="text-lg font-semibold text-gray-900">Certificates ({filteredCertificates.length})</h2>
@@ -309,6 +395,9 @@ export default function CertificatesPage() {
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Provider & Certificate
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Certificate Number
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Status
@@ -337,6 +426,9 @@ export default function CertificatesPage() {
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm font-mono text-gray-900">{certificate.certificate_number || "—"}</div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
                     <span className={getStatusBadge(certificate.certificate_status)}>
                       {certificate.certificate_status}
                     </span>
@@ -350,9 +442,16 @@ export default function CertificatesPage() {
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {certificate.expiry_date ? new Date(certificate.expiry_date).toLocaleDateString() : "—"}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {certificate.verified_by || "—"}
-                    {certificate.verification_date && (
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm text-gray-900">
+                      {certificate.reviewed_by_admin_id ? `Admin ID: ${certificate.reviewed_by_admin_id}` : (certificate.verified_by || "—")}
+                    </div>
+                    {certificate.reviewed_at && (
+                      <div className="text-xs text-gray-500">
+                        {new Date(certificate.reviewed_at).toLocaleDateString()}
+                      </div>
+                    )}
+                    {!certificate.reviewed_at && certificate.verification_date && (
                       <div className="text-xs text-gray-500">
                         {new Date(certificate.verification_date).toLocaleDateString()}
                       </div>
@@ -376,11 +475,15 @@ export default function CertificatesPage() {
                           No Document
                         </span>
                       )}
-                      {certificate.certificate_status === "pending" && (
+                      {certificate.certificate_status?.toLowerCase() === "pending" && (
                         <>
                           <button
-                            onClick={() => handleCertificateAction(certificate.certificate_id, "approve")}
-                            className="inline-flex items-center px-3 py-1.5 border border-green-300 text-xs font-medium rounded-md text-green-700 bg-green-50 hover:bg-green-100 hover:border-green-400 transition-colors"
+                            onClick={() => setApprovalConfirm({
+                              id: certificate.certificate_id,
+                              providerName: certificate.provider_name,
+                              certificateType: certificate.certificate_name
+                            })}
+                            className="inline-flex items-center px-3 py-1.5 border border-green-300 text-xs font-medium rounded-md text-green-700 bg-green-50 hover:bg-green-100 hover:border-green-400 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-1 transition-all duration-200"
                           >
                             <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -394,7 +497,7 @@ export default function CertificatesPage() {
                               certificateType: certificate.certificate_name,
                               status: certificate.certificate_status
                             })}
-                            className="inline-flex items-center px-3 py-1.5 border border-red-300 text-xs font-medium rounded-md text-red-700 bg-red-50 hover:bg-red-100 hover:border-red-400 transition-colors"
+                            className="inline-flex items-center px-3 py-1.5 border border-red-300 text-xs font-medium rounded-md text-red-700 bg-red-50 hover:bg-red-100 hover:border-red-400 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1 transition-all duration-200"
                           >
                             <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -416,6 +519,70 @@ export default function CertificatesPage() {
           )}
         </div>
       </div>
+
+      {/* Approval Confirmation Modal */}
+      {approvalConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-md w-full shadow-xl">
+            {/* Modal Header */}
+            <div className="bg-gradient-to-r from-green-600 to-green-700 px-6 py-4 rounded-t-lg">
+              <h3 className="text-lg font-semibold text-white flex items-center">
+                <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+                Approve Certificate
+              </h3>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-4">
+              <div className="flex items-start space-x-3">
+                <div className="flex-shrink-0">
+                  <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm text-gray-700 mb-3">
+                    Are you sure you want to approve this certificate?
+                  </p>
+                  <div className="bg-gray-50 rounded-md p-3 space-y-1">
+                    <p className="text-sm">
+                      <span className="font-medium text-gray-900">Provider:</span>
+                      <span className="text-gray-600 ml-2">{approvalConfirm.providerName}</span>
+                    </p>
+                    <p className="text-sm">
+                      <span className="font-medium text-gray-900">Certificate:</span>
+                      <span className="text-gray-600 ml-2">{approvalConfirm.certificateType}</span>
+                    </p>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-3">
+                    This action will verify the certificate and allow the provider to offer services.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-6 py-4 bg-gray-50 rounded-b-lg flex justify-end space-x-3">
+              <button
+                onClick={() => setApprovalConfirm(null)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 hover:shadow focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-all duration-200"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  handleCertificateAction(approvalConfirm.id, "approve");
+                }}
+                className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-all duration-200"
+              >
+                Yes, Approve Certificate
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Rejection Modal */}
       {selectedCertificate && (
@@ -495,7 +662,7 @@ export default function CertificatesPage() {
                   setCustomReason("");
                   setShowCustomReason(false);
                 }}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 hover:shadow focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-all duration-200"
               >
                 Cancel
               </button>
@@ -505,7 +672,7 @@ export default function CertificatesPage() {
                   handleCertificateAction(selectedCertificate.id, "reject", finalReason);
                 }}
                 disabled={!rejectionReason || (showCustomReason && !customReason.trim())}
-                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 disabled:bg-red-400 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 hover:shadow-lg disabled:bg-red-400 disabled:cursor-not-allowed disabled:hover:shadow-none focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-all duration-200"
               >
                 Reject Certificate
               </button>
@@ -533,6 +700,113 @@ export default function CertificatesPage() {
             </div>
             <div className="ml-3">
               <p className="text-sm text-yellow-700">{error}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Export Modal */}
+      {showExportModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900">Export Certificates</h3>
+            </div>
+            <div className="px-6 py-4 space-y-4">
+              {/* Format Selection */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Export Format</label>
+                <div className="flex gap-4">
+                  <button
+                    onClick={() => setExportFormat('csv')}
+                    className={`flex-1 px-4 py-2 rounded-lg border-2 transition-colors ${
+                      exportFormat === 'csv'
+                        ? 'border-blue-500 bg-blue-50 text-blue-700'
+                        : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'
+                    }`}
+                  >
+                    CSV
+                  </button>
+                  <button
+                    onClick={() => setExportFormat('pdf')}
+                    className={`flex-1 px-4 py-2 rounded-lg border-2 transition-colors ${
+                      exportFormat === 'pdf'
+                        ? 'border-blue-500 bg-blue-50 text-blue-700'
+                        : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'
+                    }`}
+                  >
+                    PDF
+                  </button>
+                </div>
+              </div>
+
+              {/* Filters */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Filters (Optional)</label>
+                
+                {/* Certificate Status */}
+                <div className="mb-3">
+                  <label className="block text-xs text-gray-600 mb-1">Certificate Status</label>
+                  <select
+                    value={exportFilters.certificate_status}
+                    onChange={(e) => setExportFilters({...exportFilters, certificate_status: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
+                  >
+                    <option value="">All</option>
+                    <option value="Pending">Pending</option>
+                    <option value="Approved">Approved</option>
+                    <option value="Rejected">Rejected</option>
+                  </select>
+                </div>
+
+                {/* Date Range */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs text-gray-600 mb-1">From Date</label>
+                    <input
+                      type="date"
+                      value={exportFilters.start_date}
+                      onChange={(e) => setExportFilters({...exportFilters, start_date: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-600 mb-1">To Date</label>
+                    <input
+                      type="date"
+                      value={exportFilters.end_date}
+                      onChange={(e) => setExportFilters({...exportFilters, end_date: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end gap-3 rounded-b-lg">
+              <button
+                onClick={() => setShowExportModal(false)}
+                disabled={exporting}
+                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleExport}
+                disabled={exporting}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 flex items-center gap-2"
+              >
+                {exporting ? (
+                  <>
+                    <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Exporting...
+                  </>
+                ) : (
+                  'Export'
+                )}
+              </button>
             </div>
           </div>
         </div>

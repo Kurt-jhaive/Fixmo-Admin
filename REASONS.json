@@ -28,5 +28,20 @@
     "Consistently poor service ratings or feedback",
     "Failure to fulfill confirmed appointments",
     "Providing false or misleading information during verification"
+  ],
+
+  "appointmentCancellation": [
+    "Customer no-show or unreachable",
+    "Provider no-show or cancelled",
+    "Fraudulent or suspicious activity",
+    "Violation of platform terms of service",
+    "Safety concerns reported",
+    "Duplicate booking",
+    "Service no longer needed by customer",
+    "Location or access issues",
+    "Payment dispute or fraud",
+    "Inappropriate behavior from customer or provider",
+    "Emergency situation",
+    "Other (please specify in notes)"
   ]
 }

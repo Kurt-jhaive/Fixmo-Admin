@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { adminApi, type User } from "@/lib/api";
+import { adminApi, exportApi, type User } from "@/lib/api";
 import SmartImage from "@/components/SmartImage";
 import type { ReasonsData } from "@/types/reasons";
 
@@ -42,11 +42,24 @@ export default function UsersPage() {
   const [loading, setLoading] = useState(true);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [showModal, setShowModal] = useState(false);
+  const [backendStatus, setBackendStatus] = useState<'connected' | 'disconnected'>('disconnected');
   const [filters, setFilters] = useState({
     search: "",
     verified: undefined as boolean | undefined,
     active: undefined as boolean | undefined,
   });
+
+  // Export States
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportFormat, setExportFormat] = useState<'csv' | 'pdf'>('csv');
+  const [exportFilters, setExportFilters] = useState({
+    verification_status: '',
+    is_activated: '',
+    is_verified: '',
+    start_date: '',
+    end_date: '',
+  });
+  const [exporting, setExporting] = useState(false);
 
  
 
@@ -170,6 +183,43 @@ export default function UsersPage() {
     setShowDeactivateModal(true);
   };
 
+  const handleExport = async () => {
+    if (!exportFormat) {
+      alert('Please select an export format');
+      return;
+    }
+
+    try {
+      setExporting(true);
+      
+      const exportParams = {
+        format: exportFormat,
+        search: exportFilters.verification_status || exportFilters.is_activated || exportFilters.is_verified ? '' : (filters.search || ''),
+        ...exportFilters,
+      };
+
+      const blob = await exportApi.exportUsers(exportParams);
+      
+      // Create download link
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `users_export_${new Date().toISOString().split('T')[0]}.${exportFormat}`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      setShowExportModal(false);
+      alert('Export successful!');
+    } catch (error: any) {
+      console.error('Export failed:', error);
+      alert(`Export failed: ${error.message}`);
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const confirmRejectUser = async () => {
     if (!actionUser) return;
     
@@ -290,7 +340,7 @@ export default function UsersPage() {
 
       {/* Filters */}
       <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
           <input
             type="text"
             placeholder="Search users..."
@@ -322,6 +372,15 @@ export default function UsersPage() {
           >
             Refresh
           </button>
+          <button
+            onClick={() => setShowExportModal(true)}
+            className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 flex items-center justify-center"
+          >
+            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            Export
+          </button>
         </div>
       </div>
 
@@ -344,7 +403,13 @@ export default function UsersPage() {
                     Contact
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Location
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Status
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Verified By
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Joined
@@ -389,6 +454,9 @@ export default function UsersPage() {
                       <div className="text-sm text-gray-500">{user.phone_number}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">{user.user_location || "—"}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex flex-col space-y-1">
                         <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                           user.is_verified 
@@ -405,6 +473,22 @@ export default function UsersPage() {
                           {user.is_activated ? "Active" : "Inactive"}
                         </span>
                       </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {user.verified_by_admin_id ? (
+                        <div>
+                          <div className="text-sm font-medium text-gray-900">
+                            Admin ID: {user.verified_by_admin_id}
+                          </div>
+                          {user.verification_reviewed_at && (
+                            <div className="text-xs text-gray-500">
+                              {new Date(user.verification_reviewed_at).toLocaleDateString()}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-sm text-gray-400">—</span>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {new Date(user.created_at).toLocaleDateString()}
@@ -539,6 +623,40 @@ export default function UsersPage() {
                     </div>
                   </div>
                 </div>
+
+                {/* Admin Action Tracking */}
+                {(selectedUser.verified_by_admin_id || selectedUser.deactivated_by_admin_id) && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <h4 className="font-semibold text-blue-900 mb-3 flex items-center">
+                      <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-6-3a2 2 0 11-4 0 2 2 0 014 0zm-2 4a5 5 0 00-4.546 2.916A5.986 5.986 0 0010 16a5.986 5.986 0 004.546-2.084A5 5 0 0010 11z" clipRule="evenodd" />
+                      </svg>
+                      Admin Action History
+                    </h4>
+                    <div className="space-y-2 text-sm">
+                      {selectedUser.verified_by_admin_id && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-700">Verified by Admin ID:</span>
+                          <span className="font-medium text-gray-900">{selectedUser.verified_by_admin_id}</span>
+                        </div>
+                      )}
+                      {selectedUser.verification_reviewed_at && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-700">Reviewed at:</span>
+                          <span className="font-medium text-gray-900">
+                            {new Date(selectedUser.verification_reviewed_at).toLocaleString()}
+                          </span>
+                        </div>
+                      )}
+                      {selectedUser.deactivated_by_admin_id && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-700">Deactivated by Admin ID:</span>
+                          <span className="font-medium text-gray-900">{selectedUser.deactivated_by_admin_id}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 {/* Valid ID Section */}
                 {selectedUser.valid_id && (
@@ -746,6 +864,170 @@ export default function UsersPage() {
                   </div>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Export Modal */}
+      {showExportModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full p-6">
+            <div className="bg-gradient-to-r from-green-600 to-green-700 -m-6 mb-6 px-6 py-4 rounded-t-lg">
+              <h3 className="text-xl font-bold text-white flex items-center">
+                <svg className="w-6 h-6 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V7.414A2 2 0 0015.414 6L12 2.586A2 2 0 0010.586 2H6zm5 6a1 1 0 10-2 0v3.586l-1.293-1.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V8z" clipRule="evenodd" />
+                </svg>
+                Export Users Data
+              </h3>
+            </div>
+
+            <div className="space-y-4">
+              {/* Format Selection */}
+              <div>
+                <label className="block text-sm font-medium text-gray-900 mb-2">
+                  Export Format *
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    onClick={() => setExportFormat('csv')}
+                    className={`px-4 py-3 border-2 rounded-lg font-medium transition-all ${
+                      exportFormat === 'csv'
+                        ? 'border-green-600 bg-green-50 text-green-700'
+                        : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'
+                    }`}
+                  >
+                    📊 CSV Format
+                  </button>
+                  <button
+                    onClick={() => setExportFormat('pdf')}
+                    className={`px-4 py-3 border-2 rounded-lg font-medium transition-all ${
+                      exportFormat === 'pdf'
+                        ? 'border-green-600 bg-green-50 text-green-700'
+                        : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'
+                    }`}
+                  >
+                    📄 PDF Format
+                  </button>
+                </div>
+              </div>
+
+              {/* Filters */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-900 mb-2">
+                    Verification Status
+                  </label>
+                  <select
+                    value={exportFilters.verification_status}
+                    onChange={(e) => setExportFilters({...exportFilters, verification_status: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                  >
+                    <option value="">All</option>
+                    <option value="pending">Pending</option>
+                    <option value="approved">Approved</option>
+                    <option value="rejected">Rejected</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-900 mb-2">
+                    Active Status
+                  </label>
+                  <select
+                    value={exportFilters.is_activated}
+                    onChange={(e) => setExportFilters({...exportFilters, is_activated: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                  >
+                    <option value="">All</option>
+                    <option value="true">Active</option>
+                    <option value="false">Inactive</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-900 mb-2">
+                    Verified Status
+                  </label>
+                  <select
+                    value={exportFilters.is_verified}
+                    onChange={(e) => setExportFilters({...exportFilters, is_verified: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                  >
+                    <option value="">All</option>
+                    <option value="true">Verified</option>
+                    <option value="false">Unverified</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Date Range */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-900 mb-2">
+                    From Date
+                  </label>
+                  <input
+                    type="date"
+                    value={exportFilters.start_date}
+                    onChange={(e) => setExportFilters({...exportFilters, start_date: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-900 mb-2">
+                    To Date
+                  </label>
+                  <input
+                    type="date"
+                    value={exportFilters.end_date}
+                    onChange={(e) => setExportFilters({...exportFilters, end_date: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-end space-x-3">
+              <button
+                onClick={() => {
+                  setShowExportModal(false);
+                  setExportFilters({
+                    verification_status: '',
+                    is_activated: '',
+                    is_verified: '',
+                    start_date: '',
+                    end_date: '',
+                  });
+                }}
+                disabled={exporting}
+                className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleExport}
+                disabled={exporting}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+              >
+                {exporting ? (
+                  <>
+                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Exporting...
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    Export to {exportFormat.toUpperCase()}
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>

@@ -1,4 +1,4 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://fixmo-backend-production.up.railway.app';
 import { isTokenExpired } from './auth-utils';
 
 console.log('API_BASE_URL:', API_BASE_URL); // Debug log
@@ -147,11 +147,18 @@ const makeAuthenticatedRequest = async (url: string, options: RequestInit = {}):
   
   // Check if token is expired before making request
   if (!token || isTokenExpired(token)) {
-    // Clear auth data but don't redirect here - let AuthWrapper handle it
+    // Clear auth data and redirect to login
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     localStorage.removeItem('adminToken');
     localStorage.removeItem('adminUser');
+    localStorage.removeItem('admin_token');
+    localStorage.removeItem('admin_user');
+    
+    // Redirect to login page
+    if (typeof window !== 'undefined') {
+      window.location.href = '/login';
+    }
     throw new Error('Session expired. Please login again.');
   }
 
@@ -166,11 +173,18 @@ const makeAuthenticatedRequest = async (url: string, options: RequestInit = {}):
 
   // Handle 401 Unauthorized - token expired or invalid
   if (response.status === 401) {
-    // Clear auth data but don't redirect here - let AuthWrapper handle it
+    // Clear auth data and redirect to login
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     localStorage.removeItem('adminToken');
     localStorage.removeItem('adminUser');
+    localStorage.removeItem('admin_token');
+    localStorage.removeItem('admin_user');
+    
+    // Redirect to login page
+    if (typeof window !== 'undefined') {
+      window.location.href = '/login';
+    }
     throw new Error('Session expired. Please login again.');
   }
 
@@ -390,22 +404,32 @@ export const adminApi = {
     return response.json();
   },
 
-  async approveCertificate(certificateId: number) {
+  async approveCertificate(certificateId: number, adminNotes?: string) {
     const response = await fetch(`${API_BASE_URL}/api/admin/certificates/${certificateId}/approve`, {
       method: 'PUT',
       headers: getAuthHeaders(),
+      body: JSON.stringify({ adminNotes: adminNotes || 'Certificate verified and approved' }),
     });
-    if (!response.ok) throw new Error('Failed to approve certificate');
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to approve certificate');
+    }
     return response.json();
   },
 
-  async rejectCertificate(certificateId: number, reason?: string) {
+  async rejectCertificate(certificateId: number, reason: string, adminNotes?: string) {
     const response = await fetch(`${API_BASE_URL}/api/admin/certificates/${certificateId}/reject`, {
       method: 'PUT',
       headers: getAuthHeaders(),
-      body: reason ? JSON.stringify({ reason }) : undefined,
+      body: JSON.stringify({ 
+        reason,
+        adminNotes: adminNotes || ''
+      }),
     });
-    if (!response.ok) throw new Error('Failed to reject certificate');
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to reject certificate');
+    }
     return response.json();
   },
 
@@ -558,6 +582,9 @@ export interface User {
   is_activated: boolean;
   birthday?: string;
   exact_location?: string;
+  verified_by_admin_id?: number;
+  deactivated_by_admin_id?: number;
+  verification_reviewed_at?: string;
 }
 
 export interface ServiceProvider {
@@ -578,6 +605,9 @@ export interface ServiceProvider {
   provider_isActivated: boolean;
   provider_birthday?: string;
   provider_exact_location?: string;
+  verified_by_admin_id?: number;
+  deactivated_by_admin_id?: number;
+  verification_reviewed_at?: string;
 }
 
 export interface Certificate {
@@ -589,6 +619,8 @@ export interface Certificate {
   provider_id: number;
   expiry_date?: string;
   created_at: string;
+  reviewed_by_admin_id?: number;
+  reviewed_at?: string;
 }
 
 export interface DashboardStats {
@@ -627,6 +659,7 @@ export interface Appointment {
   warranty_paused_at: string | null;
   warranty_remaining_days: number | null;
   cancellation_reason: string | null;
+  cancelled_by_admin_id?: number;
   days_left: number | null;
   customer: {
     user_id: number;
@@ -674,6 +707,9 @@ export interface BackjobApplication {
     provider_first_name: string;
     provider_last_name: string;
     provider_email: string;
+    provider_uli?: string;
+    provider_location?: string;
+    provider_exact_location?: string;
   };
 }
 
@@ -717,7 +753,7 @@ export const appointmentsApi = {
       }
     });
 
-    const response = await authenticatedFetch(
+    const response = await makeAuthenticatedRequest(
       `${API_BASE_URL}/api/appointments?${queryParams.toString()}`
     );
 
@@ -730,7 +766,7 @@ export const appointmentsApi = {
   },
 
   async getById(appointmentId: number): Promise<any> {
-    const response = await authenticatedFetch(
+    const response = await makeAuthenticatedRequest(
       `${API_BASE_URL}/api/appointments/${appointmentId}`
     );
 
@@ -743,7 +779,7 @@ export const appointmentsApi = {
   },
 
   async adminCancel(appointmentId: number, data: AdminCancelRequest): Promise<any> {
-    const response = await authenticatedFetch(
+    const response = await makeAuthenticatedRequest(
       `${API_BASE_URL}/api/appointments/${appointmentId}/admin-cancel`,
       {
         method: 'POST',
@@ -773,7 +809,7 @@ export const appointmentsApi = {
       console.log('Fetching backjobs from:', url);
       console.log('Query params:', Object.fromEntries(queryParams));
 
-      const response = await authenticatedFetch(url);
+      const response = await makeAuthenticatedRequest(url);
 
       console.log('Response status:', response.status);
 
@@ -799,7 +835,7 @@ export const appointmentsApi = {
   },
 
   async updateBackjob(backjobId: number, data: BackjobUpdateRequest): Promise<any> {
-    const response = await authenticatedFetch(
+    const response = await makeAuthenticatedRequest(
       `${API_BASE_URL}/api/appointments/backjobs/${backjobId}`,
       {
         method: 'PATCH',
@@ -815,8 +851,42 @@ export const appointmentsApi = {
     return response.json();
   },
 
+  async approveDispute(backjobId: number, adminNotes: string): Promise<any> {
+    const response = await makeAuthenticatedRequest(
+      `${API_BASE_URL}/api/appointments/backjobs/${backjobId}/approve-dispute`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ admin_notes: adminNotes }),
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to approve dispute');
+    }
+
+    return response.json();
+  },
+
+  async rejectDispute(backjobId: number, adminNotes: string): Promise<any> {
+    const response = await makeAuthenticatedRequest(
+      `${API_BASE_URL}/api/appointments/backjobs/${backjobId}/reject-dispute`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ admin_notes: adminNotes }),
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to reject dispute');
+    }
+
+    return response.json();
+  },
+
   async getStats(): Promise<any> {
-    const response = await authenticatedFetch(
+    const response = await makeAuthenticatedRequest(
       `${API_BASE_URL}/api/appointments/stats`
     );
 
@@ -826,6 +896,94 @@ export const appointmentsApi = {
     }
 
     return response.json();
+  },
+};
+
+// Export API
+export interface ExportFilters {
+  format: 'csv' | 'pdf';
+  [key: string]: any;
+}
+
+export const exportApi = {
+  async exportUsers(filters: ExportFilters): Promise<Blob> {
+    const queryParams = new URLSearchParams();
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        queryParams.append(key, String(value));
+      }
+    });
+
+    const response = await makeAuthenticatedRequest(
+      `${API_BASE_URL}/api/admin/export/users?${queryParams.toString()}`
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to export users');
+    }
+
+    return response.blob();
+  },
+
+  async exportProviders(filters: ExportFilters): Promise<Blob> {
+    const queryParams = new URLSearchParams();
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        queryParams.append(key, String(value));
+      }
+    });
+
+    const response = await makeAuthenticatedRequest(
+      `${API_BASE_URL}/api/admin/export/providers?${queryParams.toString()}`
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to export providers');
+    }
+
+    return response.blob();
+  },
+
+  async exportCertificates(filters: ExportFilters): Promise<Blob> {
+    const queryParams = new URLSearchParams();
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        queryParams.append(key, String(value));
+      }
+    });
+
+    const response = await makeAuthenticatedRequest(
+      `${API_BASE_URL}/api/admin/export/certificates?${queryParams.toString()}`
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to export certificates');
+    }
+
+    return response.blob();
+  },
+
+  async exportAppointments(filters: ExportFilters): Promise<Blob> {
+    const queryParams = new URLSearchParams();
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        queryParams.append(key, String(value));
+      }
+    });
+
+    const response = await makeAuthenticatedRequest(
+      `${API_BASE_URL}/api/admin/export/appointments?${queryParams.toString()}`
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to export appointments');
+    }
+
+    return response.blob();
   },
 };
 
