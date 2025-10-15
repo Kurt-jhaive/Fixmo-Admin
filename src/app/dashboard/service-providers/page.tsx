@@ -65,6 +65,7 @@ export default function ServiceProvidersPage() {
   // Rejection/Deactivation Modal States
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [showDeactivateModal, setShowDeactivateModal] = useState(false);
+  const [showApproveModal, setShowApproveModal] = useState(false);
   const [actionProvider, setActionProvider] = useState<ServiceProvider | null>(null);
   const [rejectionReason, setRejectionReason] = useState("");
   const [deactivationReason, setDeactivationReason] = useState("");
@@ -170,9 +171,17 @@ export default function ServiceProvidersPage() {
     try {
       await adminApi.verifyProvider(providerId, true);
       await fetchProviders(); // Refresh the list
+      setShowApproveModal(false);
+      setActionProvider(null);
     } catch (error) {
       console.error('Error verifying provider:', error);
+      alert(error instanceof Error ? error.message : 'Failed to approve provider');
     }
+  };
+
+  const handleApproveClick = (provider: ServiceProvider) => {
+    setActionProvider(provider);
+    setShowApproveModal(true);
   };
 
   const handleRejectProvider = (provider: ServiceProvider) => {
@@ -550,7 +559,7 @@ export default function ServiceProvidersPage() {
                     {!provider.provider_isVerified && provider.verification_status !== 'rejected' && (
                       <>
                         <button
-                          onClick={() => handleVerifyProvider(provider.provider_id.toString())}
+                          onClick={() => handleApproveClick(provider)}
                           className="text-green-600 hover:text-green-900 font-medium"
                         >
                           Approve
@@ -765,8 +774,8 @@ export default function ServiceProvidersPage() {
                           <div className="grid grid-cols-2 gap-2">
                             <button
                               onClick={() => {
-                                handleVerifyProvider(selectedProvider.provider_id.toString());
                                 setShowModal(false);
+                                handleApproveClick(selectedProvider);
                               }}
                               className="flex items-center justify-center px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors"
                             >
@@ -850,6 +859,56 @@ export default function ServiceProvidersPage() {
                 : 'No service providers have been registered yet.'
               }
             </p>
+          </div>
+        </div>
+      )}
+
+      {/* Provider Approve Confirmation Modal */}
+      {showApproveModal && actionProvider && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+            <div className="p-6">
+              <div className="flex items-center justify-center w-12 h-12 mx-auto bg-green-100 rounded-full mb-4">
+                <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-semibold text-center mb-2">Approve Provider Verification</h3>
+              <p className="text-sm text-gray-600 text-center mb-4">
+                Are you sure you want to approve the verification for <strong>{actionProvider.provider_first_name} {actionProvider.provider_last_name}</strong>?
+              </p>
+              <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div className="text-gray-600">Email:</div>
+                  <div className="font-medium">{actionProvider.provider_email}</div>
+                  <div className="text-gray-600">Phone:</div>
+                  <div className="font-medium">{actionProvider.provider_phone_number}</div>
+                  <div className="text-gray-600">Username:</div>
+                  <div className="font-medium">{actionProvider.provider_userName}</div>
+                  <div className="text-gray-600">License ID:</div>
+                  <div className="font-medium">{actionProvider.provider_uli || 'N/A'}</div>
+                  <div className="text-gray-600">Location:</div>
+                  <div className="font-medium">{actionProvider.provider_location || 'N/A'}</div>
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setShowApproveModal(false);
+                    setActionProvider(null);
+                  }}
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleVerifyProvider(actionProvider.provider_id.toString())}
+                  className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                >
+                  Approve Verification
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
