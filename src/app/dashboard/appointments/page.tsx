@@ -1,7 +1,7 @@
-  'use client';
+'use client';
 
-  import { useState, useEffect } from 'react';
-  import { appointmentsApi, exportApi } from '@/lib/api';
+import { useState, useEffect } from 'react';
+import { appointmentsApi, exportApi, getAdminName } from '@/lib/api';
 
   interface Appointment {
     appointment_id: number;
@@ -129,6 +129,21 @@
     "Warranty claim is valid and justified",
     "Other (please specify in notes)"
   ];
+
+  // Admin Name Display Component
+  function AdminName({ adminId }: { adminId: number | null | undefined }) {
+    const [adminName, setAdminName] = useState<string>('Loading...');
+
+    useEffect(() => {
+      if (adminId) {
+        getAdminName(adminId).then(setAdminName);
+      } else {
+        setAdminName('—');
+      }
+    }, [adminId]);
+
+    return <span>{adminName}</span>;
+  }
 
   export default function AppointmentsPage() {
     const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -600,7 +615,7 @@
                           <td className="px-6 py-4 whitespace-nowrap">
                             {appointment.cancelled_by_admin_id ? (
                               <div className="text-sm font-medium text-gray-900">
-                                Admin ID: {appointment.cancelled_by_admin_id}
+                                <AdminName adminId={appointment.cancelled_by_admin_id} />
                               </div>
                             ) : (
                               <span className="text-sm text-gray-400">—</span>
@@ -1016,8 +1031,10 @@
                         </div>
                         {selectedAppointment.cancelled_by_admin_id && (
                           <div className="bg-blue-50 border border-blue-200 rounded p-3 mt-2">
-                            <label className="text-gray-700 font-medium">Cancelled by Admin ID:</label>
-                            <p className="text-blue-900 font-semibold">{selectedAppointment.cancelled_by_admin_id}</p>
+                            <label className="text-gray-700 font-medium">Cancelled by:</label>
+                            <p className="text-blue-900 font-semibold">
+                              <AdminName adminId={selectedAppointment.cancelled_by_admin_id} />
+                            </p>
                           </div>
                         )}
                       </div>

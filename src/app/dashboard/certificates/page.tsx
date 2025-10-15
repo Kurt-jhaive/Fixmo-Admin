@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { adminApi, type Certificate, exportApi } from "@/lib/api";
+import { adminApi, type Certificate, exportApi, getAdminName } from "@/lib/api";
 import { getImageUrl } from "@/lib/image-utils";
 import type { ReasonsData } from "@/types/reasons";
 
@@ -71,6 +71,21 @@ const isExpiringSoon = (expiryDate?: string) => {
   thirtyDaysFromNow.setDate(now.getDate() + 30);
   return expiry <= thirtyDaysFromNow && expiry > now;
 };
+
+// Admin Name Display Component
+function AdminName({ adminId }: { adminId: number | null | undefined }) {
+  const [adminName, setAdminName] = useState<string>('Loading...');
+
+  useEffect(() => {
+    if (adminId) {
+      getAdminName(adminId).then(setAdminName);
+    } else {
+      setAdminName('—');
+    }
+  }, [adminId]);
+
+  return <span>{adminName}</span>;
+}
 
 export default function CertificatesPage() {
   const [certificates, setCertificates] = useState<CertificateWithProvider[]>([]);
@@ -444,7 +459,11 @@ export default function CertificatesPage() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-900">
-                      {certificate.reviewed_by_admin_id ? `Admin ID: ${certificate.reviewed_by_admin_id}` : (certificate.verified_by || "—")}
+                      {certificate.reviewed_by_admin_id ? (
+                        <AdminName adminId={certificate.reviewed_by_admin_id} />
+                      ) : (
+                        certificate.verified_by || "—"
+                      )}
                     </div>
                     {certificate.reviewed_at && (
                       <div className="text-xs text-gray-500">

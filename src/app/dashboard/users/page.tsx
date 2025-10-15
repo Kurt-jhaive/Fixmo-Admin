@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { adminApi, exportApi, type User } from "@/lib/api";
+import { adminApi, exportApi, getAdminName, type User } from "@/lib/api";
 import SmartImage from "@/components/SmartImage";
 import type { ReasonsData } from "@/types/reasons";
 
@@ -36,6 +36,21 @@ const reasonsData: ReasonsData = {
     "Providing false or misleading information during verification"
   ]
 };
+
+// Admin Name Display Component
+function AdminName({ adminId }: { adminId: number | null | undefined }) {
+  const [adminName, setAdminName] = useState<string>('Loading...');
+
+  useEffect(() => {
+    if (adminId) {
+      getAdminName(adminId).then(setAdminName);
+    } else {
+      setAdminName('—');
+    }
+  }, [adminId]);
+
+  return <span>{adminName}</span>;
+}
 
 export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([]);
@@ -478,7 +493,7 @@ export default function UsersPage() {
                       {user.verified_by_admin_id ? (
                         <div>
                           <div className="text-sm font-medium text-gray-900">
-                            Admin ID: {user.verified_by_admin_id}
+                            <AdminName adminId={user.verified_by_admin_id} />
                           </div>
                           {user.verification_reviewed_at && (
                             <div className="text-xs text-gray-500">
@@ -636,8 +651,10 @@ export default function UsersPage() {
                     <div className="space-y-2 text-sm">
                       {selectedUser.verified_by_admin_id && (
                         <div className="flex justify-between">
-                          <span className="text-gray-700">Verified by Admin ID:</span>
-                          <span className="font-medium text-gray-900">{selectedUser.verified_by_admin_id}</span>
+                          <span className="text-gray-700">Verified by:</span>
+                          <span className="font-medium text-gray-900">
+                            <AdminName adminId={selectedUser.verified_by_admin_id} />
+                          </span>
                         </div>
                       )}
                       {selectedUser.verification_reviewed_at && (
@@ -650,8 +667,10 @@ export default function UsersPage() {
                       )}
                       {selectedUser.deactivated_by_admin_id && (
                         <div className="flex justify-between">
-                          <span className="text-gray-700">Deactivated by Admin ID:</span>
-                          <span className="font-medium text-gray-900">{selectedUser.deactivated_by_admin_id}</span>
+                          <span className="text-gray-700">Deactivated by:</span>
+                          <span className="font-medium text-gray-900">
+                            <AdminName adminId={selectedUser.deactivated_by_admin_id} />
+                          </span>
                         </div>
                       )}
                     </div>

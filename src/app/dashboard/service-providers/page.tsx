@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { adminApi, ServiceProvider, exportApi } from '@/lib/api';
+import { adminApi, ServiceProvider, exportApi, getAdminName } from '@/lib/api';
 import { SmartImage } from '@/components/SmartImage';
 import { getImageUrl } from '@/lib/image-utils';
 import type { ReasonsData } from "@/types/reasons";
@@ -37,6 +37,21 @@ const reasonsData: ReasonsData = {
     "Providing false or misleading information during verification"
   ]
 };
+
+// Admin Name Display Component
+function AdminName({ adminId }: { adminId: number | null | undefined }) {
+  const [adminName, setAdminName] = useState<string>('Loading...');
+
+  useEffect(() => {
+    if (adminId) {
+      getAdminName(adminId).then(setAdminName);
+    } else {
+      setAdminName('—');
+    }
+  }, [adminId]);
+
+  return <span>{adminName}</span>;
+}
 
 export default function ServiceProvidersPage() {
   const [providers, setProviders] = useState<ServiceProvider[]>([]);
@@ -512,7 +527,7 @@ export default function ServiceProvidersPage() {
                     {provider.verified_by_admin_id ? (
                       <div>
                         <div className="text-sm font-medium text-gray-900">
-                          Admin ID: {provider.verified_by_admin_id}
+                          <AdminName adminId={provider.verified_by_admin_id} />
                         </div>
                         {provider.verification_reviewed_at && (
                           <div className="text-xs text-gray-500">
@@ -714,8 +729,10 @@ export default function ServiceProvidersPage() {
                       <div className="space-y-2 text-sm">
                         {selectedProvider.verified_by_admin_id && (
                           <div className="flex justify-between">
-                            <span className="text-gray-700">Verified by Admin ID:</span>
-                            <span className="font-medium text-gray-900">{selectedProvider.verified_by_admin_id}</span>
+                            <span className="text-gray-700">Verified by:</span>
+                            <span className="font-medium text-gray-900">
+                              <AdminName adminId={selectedProvider.verified_by_admin_id} />
+                            </span>
                           </div>
                         )}
                         {selectedProvider.verification_reviewed_at && (
@@ -728,8 +745,10 @@ export default function ServiceProvidersPage() {
                         )}
                         {selectedProvider.deactivated_by_admin_id && (
                           <div className="flex justify-between">
-                            <span className="text-gray-700">Deactivated by Admin ID:</span>
-                            <span className="font-medium text-gray-900">{selectedProvider.deactivated_by_admin_id}</span>
+                            <span className="text-gray-700">Deactivated by:</span>
+                            <span className="font-medium text-gray-900">
+                              <AdminName adminId={selectedProvider.deactivated_by_admin_id} />
+                            </span>
                           </div>
                         )}
                       </div>

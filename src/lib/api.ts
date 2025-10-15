@@ -525,6 +525,21 @@ export const adminApi = {
     return data;
   },
 
+  async getAdminById(adminId: number) {
+    console.log('Fetching admin by ID:', adminId);
+    const response = await fetch(`${API_BASE_URL}/api/admin/${adminId}`, {
+      headers: getAuthHeaders(),
+    });
+    
+    if (!response.ok) {
+      console.error('Admin fetch error:', response.status);
+      return null; // Return null if admin not found
+    }
+    
+    const data = await response.json();
+    return data;
+  },
+
   async inviteAdmin(adminData: { email: string; name: string; role: 'admin' | 'super_admin' }) {
     const response = await fetch(`${API_BASE_URL}/api/admin/`, {
       method: 'POST',
@@ -987,3 +1002,28 @@ export const exportApi = {
   },
 };
 
+// Admin cache for tracking
+const adminCache: Map<number, { name: string; email: string }> = new Map();
+
+export const getAdminName = async (adminId: number | null | undefined): Promise<string> => {
+  if (!adminId) return '—';
+  
+  // Check cache first
+  if (adminCache.has(adminId)) {
+    const admin = adminCache.get(adminId)!;
+    return `${admin.name} (ID: ${adminId})`;
+  }
+  
+  // Fetch from API
+  try {
+    const admin = await adminApi.getAdminById(adminId);
+    if (admin) {
+      adminCache.set(adminId, { name: admin.name, email: admin.email });
+      return `${admin.name} (ID: ${adminId})`;
+    }
+  } catch (error) {
+    console.error('Error fetching admin:', error);
+  }
+  
+  return `Admin ID: ${adminId}`;
+};
