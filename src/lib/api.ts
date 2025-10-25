@@ -445,24 +445,31 @@ export const adminApi = {
     
     try {
       // Fetch data from multiple endpoints to calculate stats
-      const [usersResponse, providersResponse, certificatesResponse] = await Promise.all([
+      // Request just 1 item per page but get the total count from pagination
+      const [usersResponse, providersResponse, certificatesResponse, appointmentsResponse] = await Promise.all([
         fetch(`${API_BASE_URL}/api/admin/users`, { headers: getAuthHeaders() }),
         fetch(`${API_BASE_URL}/api/admin/providers`, { headers: getAuthHeaders() }),
-        fetch(`${API_BASE_URL}/api/admin/certificates`, { headers: getAuthHeaders() })
+        fetch(`${API_BASE_URL}/api/admin/certificates`, { headers: getAuthHeaders() }),
+        fetch(`${API_BASE_URL}/api/appointments?limit=1`, { headers: getAuthHeaders() })
       ]);
 
       console.log('Users response status:', usersResponse.status);
       console.log('Providers response status:', providersResponse.status);
       console.log('Certificates response status:', certificatesResponse.status);
+      console.log('Appointments response status:', appointmentsResponse.status);
 
       // Handle responses
       const users = usersResponse.ok ? await usersResponse.json() : { users: [] };
       const providers = providersResponse.ok ? await providersResponse.json() : { providers: [] };
       const certificates = certificatesResponse.ok ? await certificatesResponse.json() : { certificates: [] };
+      const appointments = appointmentsResponse.ok ? await appointmentsResponse.json() : { data: [], pagination: { total: 0 } };
 
       console.log('Users data:', users);
       console.log('Providers data:', providers);
       console.log('Certificates data:', certificates);
+      console.log('Appointments data:', appointments);
+      console.log('Appointments pagination:', appointments.pagination);
+      console.log('Total appointments from API:', appointments.pagination?.total);
 
       // Calculate stats
       const stats = {
@@ -476,6 +483,7 @@ export const adminApi = {
         totalCertificates: Array.isArray(certificates.certificates) 
           ? certificates.certificates.length
           : (Array.isArray(certificates) ? certificates.length : 0),
+        totalAppointments: appointments.pagination?.total ?? appointments.pagination?.totalCount ?? (Array.isArray(appointments.data) ? appointments.data.length : 0),
       };
 
       console.log('Calculated dashboard stats:', stats);
@@ -488,6 +496,7 @@ export const adminApi = {
         activeServiceProviders: 0,
         pendingVerifications: 0,
         totalCertificates: 0,
+        totalAppointments: 0,
       };
     }
   },

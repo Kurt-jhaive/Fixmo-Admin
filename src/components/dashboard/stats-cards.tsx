@@ -96,13 +96,7 @@ export function StatsCards() {
       value: stats?.pendingVerifications || 0,
       icon: "⏳",
       color: "text-yellow-600",
-    },
-    {
-      title: "Total Appointments",
-      value: stats?.totalAppointments || 0,
-      icon: "📅",
-      color: "text-purple-600",
-    },
+    }
   ];
 
   if (loading) {
@@ -128,14 +122,7 @@ export function StatsCards() {
       {/* Backend Status Indicator */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-2">
-          <div className={`w-3 h-3 rounded-full ${
-            backendStatus === 'connected' ? 'bg-green-500' : 
-            backendStatus === 'disconnected' ? 'bg-red-500' : 'bg-yellow-500'
-          }`}></div>
-          <span className="text-sm text-gray-600">
-            Backend: {backendStatus === 'connected' ? 'Connected' : 
-                     backendStatus === 'disconnected' ? 'Disconnected (using mock data)' : 'Checking...'}
-          </span>
+
         </div>
       </div>
 

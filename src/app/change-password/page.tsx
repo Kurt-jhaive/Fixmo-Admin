@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { authApi, type ChangePasswordRequest } from '@/lib/api';
 
-export default function ChangePasswordPage() {
+function ChangePasswordForm() {
   const [passwords, setPasswords] = useState<ChangePasswordRequest & { confirm_password: string }>({
     current_password: '',
     new_password: '',
@@ -412,5 +412,17 @@ export default function ChangePasswordPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ChangePasswordPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 to-orange-100">
+        <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-orange-600"></div>
+      </div>
+    }>
+      <ChangePasswordForm />
+    </Suspense>
   );
 }
