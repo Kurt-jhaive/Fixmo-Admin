@@ -644,13 +644,6 @@ export interface Certificate {
   reviewed_at?: string;
 }
 
-export interface DashboardStats {
-  totalUsers: number;
-  activeServiceProviders: number;
-  pendingVerifications: number;
-  totalCertificates: number;
-}
-
 export interface Admin {
   id: number;
   username: string;

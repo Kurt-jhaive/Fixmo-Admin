@@ -24,16 +24,26 @@ export function StatsCards() {
           console.log('Backend connected, fetching real data...');
           try {
             const data = await adminApi.getDashboardStats();
-            setStats(data);
+            // Map API response to DashboardStats interface
+            setStats({
+              totalUsers: (data as Record<string, number>).totalUsers || 0,
+              totalProviders: (data as Record<string, number>).activeServiceProviders || (data as Record<string, number>).totalProviders || 0,
+              totalAppointments: (data as Record<string, number>).totalAppointments || 0,
+              totalRevenue: (data as Record<string, number>).totalRevenue || 0,
+              pendingVerifications: (data as Record<string, number>).pendingVerifications || 0,
+              activeDisputes: (data as Record<string, number>).activeDisputes || 0,
+            });
           } catch (apiError) {
             console.error('API call failed even though backend is connected:', apiError);
             setBackendStatus('disconnected');
             // Use mock data as fallback
             setStats({
               totalUsers: 156,
-              activeServiceProviders: 43,
+              totalProviders: 43,
+              totalAppointments: 89,
+              totalRevenue: 45600,
               pendingVerifications: 12,
-              totalCertificates: 89,
+              activeDisputes: 3,
             });
           }
         } else {
@@ -41,9 +51,11 @@ export function StatsCards() {
           // Use mock data when backend is not available
           setStats({
             totalUsers: 156,
-            activeServiceProviders: 43,
+            totalProviders: 43,
+            totalAppointments: 89,
+            totalRevenue: 45600,
             pendingVerifications: 12,
-            totalCertificates: 89,
+            activeDisputes: 3,
           });
         }
       } catch (error) {
@@ -52,9 +64,11 @@ export function StatsCards() {
         // Fallback to mock data
         setStats({
           totalUsers: 156,
-          activeServiceProviders: 43,
+          totalProviders: 43,
+          totalAppointments: 89,
+          totalRevenue: 45600,
           pendingVerifications: 12,
-          totalCertificates: 89,
+          activeDisputes: 3,
         });
       } finally {
         setLoading(false);
@@ -72,8 +86,8 @@ export function StatsCards() {
       color: "text-blue-600",
     },
     {
-      title: "Active Service Providers",
-      value: stats?.activeServiceProviders || 0,
+      title: "Service Providers",
+      value: stats?.totalProviders || 0,
       icon: "🔧",
       color: "text-green-600",
     },
@@ -84,9 +98,9 @@ export function StatsCards() {
       color: "text-yellow-600",
     },
     {
-      title: "Total Certificates",
-      value: stats?.totalCertificates || 0,
-      icon: "📜",
+      title: "Total Appointments",
+      value: stats?.totalAppointments || 0,
+      icon: "📅",
       color: "text-purple-600",
     },
   ];
