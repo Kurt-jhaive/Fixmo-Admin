@@ -692,6 +692,7 @@ export interface Appointment {
     provider_rating: number;
   };
   service: {
+    service_id: number;
     service_title: string;
     service_startingprice: number;
   };
@@ -704,9 +705,9 @@ export interface BackjobApplication {
   provider_id: number;
   status: string;
   reason: string;
-  evidence: any;
+  evidence: unknown;
   provider_dispute_reason: string | null;
-  provider_dispute_evidence: any;
+  provider_dispute_evidence: unknown;
   admin_notes: string | null;
   created_at: string;
   updated_at: string;
@@ -758,9 +759,45 @@ export interface BackjobUpdateRequest {
   admin_notes: string;
 }
 
+export interface BackjobsResponse {
+  success: boolean;
+  data: BackjobApplication[];
+  pagination?: {
+    total: number;
+    total_pages: number;
+    current_page: number;
+    per_page: number;
+  };
+}
+
+export interface DisputeResponse {
+  success: boolean;
+  message: string;
+  data: BackjobApplication;
+}
+
+export interface DashboardStats {
+  totalUsers: number;
+  totalProviders: number;
+  totalAppointments: number;
+  totalRevenue: number;
+  pendingVerifications: number;
+  activeDisputes: number;
+  [key: string]: number | string;
+}
+
 // Appointments API
 export const appointmentsApi = {
-  async getAll(filters: AppointmentFilters = {}): Promise<any> {
+  async getAll(filters: AppointmentFilters = {}): Promise<{ 
+    success: boolean; 
+    data: Appointment[]; 
+    pagination: { 
+      total: number; 
+      page: number; 
+      limit: number; 
+      total_pages: number; 
+    } 
+  }> {
     const queryParams = new URLSearchParams();
     Object.entries(filters).forEach(([key, value]) => {
       if (value !== undefined && value !== null) {
@@ -780,7 +817,7 @@ export const appointmentsApi = {
     return response.json();
   },
 
-  async getById(appointmentId: number): Promise<any> {
+  async getById(appointmentId: number): Promise<Appointment> {
     const response = await makeAuthenticatedRequest(
       `${API_BASE_URL}/api/appointments/${appointmentId}`
     );
@@ -793,7 +830,7 @@ export const appointmentsApi = {
     return response.json();
   },
 
-  async adminCancel(appointmentId: number, data: AdminCancelRequest): Promise<any> {
+  async adminCancel(appointmentId: number, data: AdminCancelRequest): Promise<{ success: boolean; message: string; data: Appointment }> {
     const response = await makeAuthenticatedRequest(
       `${API_BASE_URL}/api/appointments/${appointmentId}/admin-cancel`,
       {
@@ -810,7 +847,7 @@ export const appointmentsApi = {
     return response.json();
   },
 
-  async getBackjobs(filters: BackjobFilters = {}): Promise<any> {
+  async getBackjobs(filters: BackjobFilters = {}): Promise<BackjobsResponse> {
     try {
       const queryParams = new URLSearchParams();
       Object.entries(filters).forEach(([key, value]) => {
@@ -849,7 +886,7 @@ export const appointmentsApi = {
     }
   },
 
-  async updateBackjob(backjobId: number, data: BackjobUpdateRequest): Promise<any> {
+  async updateBackjob(backjobId: number, data: BackjobUpdateRequest): Promise<{ success: boolean; message: string; data: BackjobApplication }> {
     const response = await makeAuthenticatedRequest(
       `${API_BASE_URL}/api/appointments/backjobs/${backjobId}`,
       {
@@ -866,7 +903,7 @@ export const appointmentsApi = {
     return response.json();
   },
 
-  async approveDispute(backjobId: number, adminNotes: string): Promise<any> {
+  async approveDispute(backjobId: number, adminNotes: string): Promise<DisputeResponse> {
     const response = await makeAuthenticatedRequest(
       `${API_BASE_URL}/api/appointments/backjobs/${backjobId}/approve-dispute`,
       {
@@ -883,7 +920,7 @@ export const appointmentsApi = {
     return response.json();
   },
 
-  async rejectDispute(backjobId: number, adminNotes: string): Promise<any> {
+  async rejectDispute(backjobId: number, adminNotes: string): Promise<DisputeResponse> {
     const response = await makeAuthenticatedRequest(
       `${API_BASE_URL}/api/appointments/backjobs/${backjobId}/reject-dispute`,
       {
@@ -900,7 +937,7 @@ export const appointmentsApi = {
     return response.json();
   },
 
-  async getStats(): Promise<any> {
+  async getStats(): Promise<DashboardStats> {
     const response = await makeAuthenticatedRequest(
       `${API_BASE_URL}/api/appointments/stats`
     );
@@ -917,7 +954,7 @@ export const appointmentsApi = {
 // Export API
 export interface ExportFilters {
   format: 'csv' | 'pdf';
-  [key: string]: any;
+  [key: string]: string | undefined;
 }
 
 export const exportApi = {

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { adminApi, ServiceProvider, exportApi, getAdminName } from '@/lib/api';
+import { adminApi, ServiceProvider, exportApi, getAdminName, authApi } from '@/lib/api';
 import { SmartImage } from '@/components/SmartImage';
 import { getImageUrl } from '@/lib/image-utils';
 import type { ReasonsData } from "@/types/reasons";
@@ -61,6 +61,7 @@ export default function ServiceProvidersPage() {
   const [selectedProvider, setSelectedProvider] = useState<ServiceProvider | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [backendStatus, setBackendStatus] = useState<'unknown' | 'connected' | 'disconnected'>('unknown');
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   
   // Rejection/Deactivation Modal States
   const [showRejectModal, setShowRejectModal] = useState(false);
@@ -83,6 +84,11 @@ export default function ServiceProvidersPage() {
     end_date: ''
   });
   const [exporting, setExporting] = useState(false);
+
+  useEffect(() => {
+    const user = authApi.getStoredUser();
+    setIsSuperAdmin(user?.role === 'super_admin');
+  }, []);
 
   const fetchProviders = useCallback(async () => {
     try {
@@ -248,29 +254,15 @@ export default function ServiceProvidersPage() {
       setExporting(true);
 
       // Build export parameters
-      const exportParams: any = {
-        format: exportFormat,
+      const exportParams = {
+        format: exportFormat as 'csv' | 'pdf',
+        verification_status: exportFilters.verification_status,
+        provider_isActivated: exportFilters.provider_isActivated,
+        provider_isVerified: exportFilters.provider_isVerified,
+        start_date: exportFilters.start_date,
+        end_date: exportFilters.end_date,
+        search: searchTerm || undefined,
       };
-
-      // Add filters if they have values
-      if (exportFilters.verification_status) {
-        exportParams.verification_status = exportFilters.verification_status;
-      }
-      if (exportFilters.provider_isActivated) {
-        exportParams.provider_isActivated = exportFilters.provider_isActivated;
-      }
-      if (exportFilters.provider_isVerified) {
-        exportParams.provider_isVerified = exportFilters.provider_isVerified;
-      }
-      if (exportFilters.start_date) {
-        exportParams.start_date = exportFilters.start_date;
-      }
-      if (exportFilters.end_date) {
-        exportParams.end_date = exportFilters.end_date;
-      }
-      if (searchTerm) {
-        exportParams.search = searchTerm;
-      }
 
       console.log('Exporting providers with params:', exportParams);
       
@@ -420,17 +412,19 @@ export default function ServiceProvidersPage() {
                 <option value="rejected" className="text-gray-900 bg-white">Rejected</option>
               </select>
             </div>
-            <div>
-              <button
-                onClick={() => setShowExportModal(true)}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2 min-w-[120px]"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                </svg>
-                Export
-              </button>
-            </div>
+            {isSuperAdmin && (
+              <div>
+                <button
+                  onClick={() => setShowExportModal(true)}
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2 min-w-[120px]"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                  Export
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>

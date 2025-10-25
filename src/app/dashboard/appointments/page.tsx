@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { appointmentsApi, exportApi, getAdminName } from '@/lib/api';
+import { appointmentsApi, exportApi, getAdminName, authApi } from '@/lib/api';
 
   interface Appointment {
     appointment_id: number;
@@ -148,6 +148,7 @@ import { appointmentsApi, exportApi, getAdminName } from '@/lib/api';
   export default function AppointmentsPage() {
     const [appointments, setAppointments] = useState<Appointment[]>([]);
     const [backjobs, setBackjobs] = useState<BackjobApplication[]>([]);
+    const [isSuperAdmin, setIsSuperAdmin] = useState(false);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<'appointments' | 'disputes'>('appointments');
     const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
@@ -183,6 +184,11 @@ import { appointmentsApi, exportApi, getAdminName } from '@/lib/api';
     const [exporting, setExporting] = useState(false);
 
     useEffect(() => {
+      const user = authApi.getStoredUser();
+      setIsSuperAdmin(user?.role === 'super_admin');
+    }, []);
+
+    useEffect(() => {
       if (activeTab === 'appointments') {
         fetchAppointments();
       } else {
@@ -202,13 +208,22 @@ import { appointmentsApi, exportApi, getAdminName } from '@/lib/api';
           params.status = statusFilter;
         }
 
+        console.log('Fetching appointments with params:', params);
         const response = await appointmentsApi.getAll(params);
+        console.log('Appointments response:', response);
+        
         if (response.success) {
-          setAppointments(response.data);
-          setTotalPages(response.pagination.total_pages);
+          console.log('Appointments data:', response.data);
+          console.log('Appointments count:', response.data?.length);
+          setAppointments(response.data || []);
+          setTotalPages(response.pagination?.total_pages || 1);
+        } else {
+          console.warn('Response success is false');
+          setAppointments([]);
         }
       } catch (error) {
         console.error('Error fetching appointments:', error);
+        setAppointments([]);
       } finally {
         setLoading(false);
       }
@@ -230,9 +245,9 @@ import { appointmentsApi, exportApi, getAdminName } from '@/lib/api';
             setTotalPages(response.pagination.total_pages);
           }
         }
-      } catch (error: any) {
+      } catch (error) {
         console.error('Error fetching backjobs:', error);
-        alert(`Failed to load disputed backjobs: ${error.message}`);
+        alert(`Failed to load disputed backjobs: ${error instanceof Error ? error.message : 'Unknown error'}`);
         setBackjobs([]);
       } finally {
         setLoading(false);
@@ -435,7 +450,7 @@ import { appointmentsApi, exportApi, getAdminName } from '@/lib/api';
       return colors[status] || 'bg-gray-100 text-gray-800';
     };
 
-    const filteredAppointments = appointments.filter(apt => {
+    const filteredAppointments = (appointments || []).filter(apt => {
       const searchLower = searchTerm.toLowerCase();
       return (
         apt.customer.first_name.toLowerCase().includes(searchLower) ||
@@ -517,15 +532,17 @@ import { appointmentsApi, exportApi, getAdminName } from '@/lib/api';
                 <option value="cancelled">Cancelled</option>
                 <option value="expired">Expired</option>
               </select>
-              <button
-                onClick={() => setShowExportModal(true)}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 focus:ring-2 focus:ring-green-500 flex items-center gap-2"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                </svg>
-                Export
-              </button>
+              {isSuperAdmin && (
+                <button
+                  onClick={() => setShowExportModal(true)}
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 focus:ring-2 focus:ring-green-500 flex items-center gap-2"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                  Export
+                </button>
+              )}
             </div>
 
             {/* Appointments Table */}
@@ -537,6 +554,11 @@ import { appointmentsApi, exportApi, getAdminName } from '@/lib/api';
             ) : filteredAppointments.length === 0 ? (
               <div className="text-center py-12 bg-white rounded-lg shadow">
                 <p className="text-gray-500">No appointments found</p>
+                {appointments.length === 0 && !loading && (
+                  <p className="text-sm text-gray-400 mt-2">
+                    {searchTerm ? 'Try adjusting your search criteria' : 'No appointments available in the system'}
+                  </p>
+                )}
               </div>
             ) : (
               <div className="bg-white rounded-lg shadow overflow-hidden">

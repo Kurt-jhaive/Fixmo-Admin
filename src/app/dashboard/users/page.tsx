@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { adminApi, exportApi, getAdminName, type User } from "@/lib/api";
+import { adminApi, exportApi, getAdminName, authApi, type User } from "@/lib/api";
 import SmartImage from "@/components/SmartImage";
 import type { ReasonsData } from "@/types/reasons";
 
@@ -57,7 +57,7 @@ export default function UsersPage() {
   const [loading, setLoading] = useState(true);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [showModal, setShowModal] = useState(false);
-  const [backendStatus, setBackendStatus] = useState<'connected' | 'disconnected'>('disconnected');
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [filters, setFilters] = useState({
     search: "",
     verified: undefined as boolean | undefined,
@@ -97,6 +97,11 @@ export default function UsersPage() {
   const [customReason, setCustomReason] = useState("");
   const [showCustomReason, setShowCustomReason] = useState(false);
 
+  useEffect(() => {
+    const user = authApi.getStoredUser();
+    setIsSuperAdmin(user?.role === 'super_admin');
+  }, []);
+
   const fetchUsers = useCallback(async () => {
     try {
       setLoading(true);
@@ -108,7 +113,6 @@ export default function UsersPage() {
         console.log('✅ Real API Success! Data:', data);
         console.log('� Users array:', data.users || data);
         
-        setBackendStatus('connected');
         const usersArray = data.users || data || [];
         console.log('👤 Users count:', usersArray.length);
         if (usersArray.length > 0) {
@@ -122,7 +126,6 @@ export default function UsersPage() {
         return; // Exit early if successful
       } catch (apiError) {
         console.error('❌ Real API failed:', apiError);
-        setBackendStatus('disconnected');
       }
       
       // If we get here, the real API failed, so use mock data
@@ -163,7 +166,6 @@ export default function UsersPage() {
         ]);
     } catch (error) {
       console.error("Failed to fetch users:", error);
-      setBackendStatus('disconnected');
       setUsers([]); // Empty array on error
     } finally {
       setLoading(false);
@@ -219,7 +221,11 @@ export default function UsersPage() {
       const exportParams = {
         format: exportFormat,
         search: exportFilters.verification_status || exportFilters.is_activated || exportFilters.is_verified ? '' : (filters.search || ''),
-        ...exportFilters,
+        verification_status: exportFilters.verification_status,
+        is_activated: exportFilters.is_activated,
+        is_verified: exportFilters.is_verified,
+        start_date: exportFilters.start_date,
+        end_date: exportFilters.end_date,
       };
 
       const blob = await exportApi.exportUsers(exportParams);
@@ -236,9 +242,9 @@ export default function UsersPage() {
       
       setShowExportModal(false);
       alert('Export successful!');
-    } catch (error: any) {
+    } catch (error) {
       console.error('Export failed:', error);
-      alert(`Export failed: ${error.message}`);
+      alert(`Export failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setExporting(false);
     }
@@ -396,15 +402,17 @@ export default function UsersPage() {
           >
             Refresh
           </button>
-          <button
-            onClick={() => setShowExportModal(true)}
-            className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 flex items-center justify-center"
-          >
-            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-            Export
-          </button>
+          {isSuperAdmin && (
+            <button
+              onClick={() => setShowExportModal(true)}
+              className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 flex items-center justify-center"
+            >
+              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              Export
+            </button>
+          )}
         </div>
       </div>
 

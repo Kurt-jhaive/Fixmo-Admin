@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { adminApi, type Certificate, exportApi, getAdminName } from "@/lib/api";
+import { adminApi, type Certificate, exportApi, getAdminName, authApi } from "@/lib/api";
 import { getImageUrl } from "@/lib/image-utils";
 import type { ReasonsData } from "@/types/reasons";
 
@@ -93,6 +93,7 @@ export default function CertificatesPage() {
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [selectedCertificate, setSelectedCertificate] = useState<{
     id: number;
     providerName: string;
@@ -118,6 +119,11 @@ export default function CertificatesPage() {
     end_date: ''
   });
   const [exporting, setExporting] = useState(false);
+
+  useEffect(() => {
+    const user = authApi.getStoredUser();
+    setIsSuperAdmin(user?.role === 'super_admin');
+  }, []);
 
   const fetchCertificates = useCallback(async () => {
     try {
@@ -385,17 +391,19 @@ export default function CertificatesPage() {
               Refresh
             </button>
           </div>
-          <div>
-            <button
-              onClick={() => setShowExportModal(true)}
-              className="w-full px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 flex items-center justify-center gap-2"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-              </svg>
-              Export
-            </button>
-          </div>
+          {isSuperAdmin && (
+            <div>
+              <button
+                onClick={() => setShowExportModal(true)}
+                className="w-full px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 flex items-center justify-center gap-2"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                Export
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
