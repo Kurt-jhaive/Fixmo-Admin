@@ -3,6 +3,12 @@ import { isTokenExpired } from './auth-utils';
 
 console.log('API_BASE_URL:', API_BASE_URL); // Debug log
 
+// Evidence interface for backjobs
+export interface Evidence {
+  description?: string;
+  files?: string[];
+}
+
 // Authentication interfaces
 export interface LoginRequest {
   username: string;
@@ -705,9 +711,9 @@ export interface BackjobApplication {
   provider_id: number;
   status: string;
   reason: string;
-  evidence: unknown;
+  evidence: Evidence | null;
   provider_dispute_reason: string | null;
-  provider_dispute_evidence: unknown;
+  provider_dispute_evidence: Evidence | null;
   admin_notes: string | null;
   created_at: string;
   updated_at: string;
@@ -717,6 +723,8 @@ export interface BackjobApplication {
     first_name: string;
     last_name: string;
     email: string;
+    phone_number?: string;
+    user_location?: string;
   };
   provider: {
     provider_id: number;

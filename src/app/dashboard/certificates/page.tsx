@@ -216,7 +216,7 @@ export default function CertificatesPage() {
       setExporting(true);
 
       // Build export parameters
-      const exportParams: any = {
+      const exportParams: Record<string, string> = {
         format: exportFormat,
       };
 
@@ -239,8 +239,8 @@ export default function CertificatesPage() {
 
       console.log('Exporting certificates with params:', exportParams);
       
-      // Call the export API
-      const blob = await exportApi.exportCertificates(exportParams);
+      // Call the export API - cast to satisfy ExportFilters interface
+      const blob = await exportApi.exportCertificates(exportParams as { format: 'csv' | 'pdf' } & Record<string, string>);
       
       // Create download link
       const url = window.URL.createObjectURL(blob);

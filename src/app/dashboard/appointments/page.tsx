@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { appointmentsApi, exportApi, getAdminName, authApi } from '@/lib/api';
+import { useState, useEffect, useCallback } from 'react';
+import { appointmentsApi, exportApi, getAdminName, authApi, type BackjobApplication } from '@/lib/api';
 
   interface Appointment {
     appointment_id: number;
@@ -39,55 +39,6 @@ import { appointmentsApi, exportApi, getAdminName, authApi } from '@/lib/api';
     service: {
       service_title: string;
       service_startingprice: number;
-    };
-  }
-
-  interface BackjobApplication {
-    backjob_id: number;
-    appointment_id: number;
-    customer_id: number;
-    provider_id: number;
-    status: string;
-    reason: string;
-    evidence: any;
-    provider_dispute_reason: string | null;
-    provider_dispute_evidence: any;
-    admin_notes: string | null;
-    created_at: string;
-    updated_at: string;
-    appointment: {
-      appointment_id: number;
-      appointment_status: string;
-      scheduled_date: string;
-      final_price: number | null;
-      repairDescription: string | null;
-      warranty_days: number | null;
-      warranty_expires_at: string | null;
-      warranty_paused_at: string | null;
-      warranty_remaining_days: number | null;
-      service: {
-        service_id: number;
-        service_title: string;
-        service_startingprice: number;
-      };
-    };
-    customer: {
-      user_id: number;
-      first_name: string;
-      last_name: string;
-      email: string;
-      phone_number?: string;
-      user_location?: string;
-    };
-    provider: {
-      provider_id: number;
-      provider_first_name: string;
-      provider_last_name: string;
-      provider_email: string;
-      provider_phone_number?: string;
-      provider_location?: string;
-      provider_uli?: string;
-      provider_exact_location?: string;
     };
   }
 
@@ -152,7 +103,6 @@ import { appointmentsApi, exportApi, getAdminName, authApi } from '@/lib/api';
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<'appointments' | 'disputes'>('appointments');
     const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
-    const [selectedBackjob, setSelectedBackjob] = useState<BackjobApplication | null>(null);
     const [statusFilter, setStatusFilter] = useState('all');
     const [searchTerm, setSearchTerm] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
@@ -194,12 +144,13 @@ import { appointmentsApi, exportApi, getAdminName, authApi } from '@/lib/api';
       } else {
         fetchDisputedBackjobs();
       }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [activeTab, statusFilter, currentPage]);
 
-    const fetchAppointments = async () => {
+    const fetchAppointments = useCallback(async () => {
       try {
         setLoading(true);
-        const params: any = {
+        const params: Record<string, string | number> = {
           page: currentPage,
           limit: 20,
         };
@@ -227,9 +178,9 @@ import { appointmentsApi, exportApi, getAdminName, authApi } from '@/lib/api';
       } finally {
         setLoading(false);
       }
-    };
+    }, [currentPage, statusFilter]);
 
-    const fetchDisputedBackjobs = async () => {
+    const fetchDisputedBackjobs = useCallback(async () => {
       try {
         setLoading(true);
         console.log('Fetching disputed backjobs...');
@@ -252,7 +203,7 @@ import { appointmentsApi, exportApi, getAdminName, authApi } from '@/lib/api';
       } finally {
         setLoading(false);
       }
-    };
+    }, [currentPage]);
 
     const handleCancelAppointment = async () => {
       if (!appointmentToCancel || !cancelReason.trim()) {
@@ -299,7 +250,7 @@ import { appointmentsApi, exportApi, getAdminName, authApi } from '@/lib/api';
         setExporting(true);
 
         // Build export parameters
-        const exportParams: any = {
+        const exportParams: Record<string, string> = {
           format: exportFormat,
         };
 
@@ -325,8 +276,8 @@ import { appointmentsApi, exportApi, getAdminName, authApi } from '@/lib/api';
 
         console.log('Exporting appointments with params:', exportParams);
         
-        // Call the export API
-        const blob = await exportApi.exportAppointments(exportParams);
+        // Call the export API - cast to satisfy ExportFilters interface
+        const blob = await exportApi.exportAppointments(exportParams as { format: 'csv' | 'pdf' } & Record<string, string>);
         
         // Create download link
         const url = window.URL.createObjectURL(blob);
@@ -395,9 +346,9 @@ import { appointmentsApi, exportApi, getAdminName, authApi } from '@/lib/api';
           setBackjobToResolve(null);
           fetchDisputedBackjobs();
         }
-      } catch (error: any) {
+      } catch (error) {
         console.error('Error approving dispute:', error);
-        alert(`Failed to approve dispute: ${error.message}`);
+        alert(`Failed to approve dispute: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
     };
 
@@ -426,9 +377,9 @@ import { appointmentsApi, exportApi, getAdminName, authApi } from '@/lib/api';
           setBackjobToResolve(null);
           fetchDisputedBackjobs();
         }
-      } catch (error: any) {
+      } catch (error) {
         console.error('Error rejecting dispute:', error);
-        alert(`Failed to reject dispute: ${error.message}`);
+        alert(`Failed to reject dispute: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
     };
 
@@ -1162,12 +1113,12 @@ import { appointmentsApi, exportApi, getAdminName, authApi } from '@/lib/api';
                   <svg className="w-6 h-6 mr-2" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                   </svg>
-                  Approve Provider's Dispute
+                  Approve Provider&apos;s Dispute
                 </h3>
               </div>
               <p className="text-gray-600 mb-4">
-                This will <strong>cancel the customer's backjob request</strong> and <strong>resume their warranty</strong>. 
-                Please select a reason for approving the provider's dispute.
+                This will <strong>cancel the customer&apos;s backjob request</strong> and <strong>resume their warranty</strong>. 
+                Please select a reason for approving the provider&apos;s dispute.
               </p>
               
               {/* Dropdown for reasons */}
@@ -1246,12 +1197,12 @@ import { appointmentsApi, exportApi, getAdminName, authApi } from '@/lib/api';
                   <svg className="w-6 h-6 mr-2" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                   </svg>
-                  Reject Provider's Dispute
+                  Reject Provider&apos;s Dispute
                 </h3>
               </div>
               <p className="text-gray-600 mb-4">
-                This will <strong>keep the customer's backjob request active</strong> and <strong>require the provider to reschedule</strong>. 
-                Please select a reason for rejecting the provider's dispute.
+                This will <strong>keep the customer&apos;s backjob request active</strong> and <strong>require the provider to reschedule</strong>. 
+                Please select a reason for rejecting the provider&apos;s dispute.
               </p>
               
               {/* Dropdown for reasons */}
