@@ -43,5 +43,18 @@
     "Inappropriate behavior from customer or provider",
     "Emergency situation",
     "Other (please specify in notes)"
+  ],
+
+  "violationDismissal": [
+    "Evidence shows user/provider was not at fault",
+    "Technical error or system glitch caused violation",
+    "Violation was due to circumstances beyond their control",
+    "Conflicting information resolved in user/provider's favor",
+    "Initial report was inaccurate or false",
+    "First-time offense with valid justification",
+    "Appeal evidence supports dismissal",
+    "Policy clarification shows no violation occurred",
+    "Duplicate violation entry",
+    "Other"
   ]
 }
