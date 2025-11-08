@@ -6,7 +6,9 @@ import { adminApi, testBackendConnection, type DashboardStats } from "@/lib/api"
 export function StatsCards() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
-  const [backendStatus, setBackendStatus] = useState<'unknown' | 'connected' | 'disconnected'>('unknown');
+  // backendStatus is used for logging but not displayed - kept for debugging
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [_backendStatus, setBackendStatus] = useState<'unknown' | 'connected' | 'disconnected'>('unknown');
 
   useEffect(() => {
     const fetchStats = async () => {

@@ -1132,6 +1132,20 @@ export interface PenaltyDashboardStats {
   }>;
 }
 
+export interface PenaltyPaginationData {
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export interface PenaltyPointsAdjustmentData {
+  adjustmentId: number;
+  points: number;
+  userId?: number;
+  providerId?: number;
+}
+
 // Penalty Management API
 export const penaltyApi = {
   // Get all violations with filters
@@ -1168,7 +1182,7 @@ export const penaltyApi = {
     points: number;
     adjustmentType: 'add' | 'deduct';
     reason: string;
-  }): Promise<{ success: boolean; message: string; data: any }> {
+  }): Promise<{ success: boolean; message: string; data: PenaltyPointsAdjustmentData }> {
     const response = await makeAuthenticatedRequest(
       `${API_BASE_URL}/api/penalty/admin/adjust-points`,
       {
@@ -1215,7 +1229,7 @@ export const penaltyApi = {
     providerId?: number;
     reason: string;
     resetValue?: number;
-  }): Promise<{ success: boolean; message: string; data: any }> {
+  }): Promise<{ success: boolean; message: string; data: PenaltyPointsAdjustmentData }> {
     const response = await makeAuthenticatedRequest(
       `${API_BASE_URL}/api/penalty/admin/reset-points`,
       {
@@ -1312,7 +1326,7 @@ export const penaltyApi = {
     adjustmentType?: string;
     limit?: number;
     offset?: number;
-  } = {}): Promise<{ success: boolean; data: { logs: PenaltyAdjustmentLog[]; pagination: any } }> {
+  } = {}): Promise<{ success: boolean; data: { logs: PenaltyAdjustmentLog[]; pagination: PenaltyPaginationData } }> {
     const queryParams = new URLSearchParams();
     Object.entries(filters).forEach(([key, value]) => {
       if (value !== undefined && value !== null) {
@@ -1335,7 +1349,8 @@ export const penaltyApi = {
         try {
           const error = JSON.parse(errorText);
           throw new Error(error.message || `Failed to fetch adjustment logs: ${response.status}`);
-        } catch (parseError) {
+        } catch {
+          // If JSON parse fails, throw with the text response
           throw new Error(`Failed to fetch adjustment logs: ${response.status} - ${errorText.substring(0, 200)}`);
         }
       }
@@ -1343,7 +1358,8 @@ export const penaltyApi = {
       const data = await response.json();
       console.log('Adjustment logs response data:', data);
       return data;
-    } catch (error: any) {
+    } catch (err) {
+      const error = err as Error;
       console.error('Error in getAdjustmentLogs:', error);
       throw error;
     }

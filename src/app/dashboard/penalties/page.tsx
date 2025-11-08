@@ -1,11 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import Image from 'next/image';
 import { penaltyApi, type PenaltyViolation, type RestrictedAccount, type PenaltyAdjustmentLog, type PenaltyDashboardStats } from '@/lib/api';
 import reasonsData from '@/../REASONS.json';
 import PenaltyDashboardRedesign from '@/components/dashboard/penalty-dashboard-redesign';
-import KebabMenu, { KebabButton, type KebabMenuItem } from '@/components/ui/KebabMenu';
+import KebabMenu, { KebabButton } from '@/components/ui/KebabMenu';
 import AdjustPointsModal, { type AdjustmentData } from '@/components/dashboard/AdjustPointsModal';
+import ReviewAppealModal, { type AppealReviewData } from '@/components/dashboard/ReviewAppealModal';
 
 export default function PenaltiesPage() {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'violations' | 'appeals' | 'restricted' | 'logs'>('dashboard');
@@ -28,11 +30,10 @@ export default function PenaltiesPage() {
   const [appeals, setAppeals] = useState<PenaltyViolation[]>([]);
   const [selectedAppeal, setSelectedAppeal] = useState<PenaltyViolation | null>(null);
   const [showAppealModal, setShowAppealModal] = useState(false);
-  const [appealReview, setAppealReview] = useState({ approved: true, reviewNotes: '' });
   
   // Restricted Accounts
-  const [restrictedUsers, setRestrictedUsers] = useState<RestrictedAccount[]>([]);
-  const [restrictedProviders, setRestrictedProviders] = useState<RestrictedAccount[]>([]);
+  const [restrictedUsers] = useState<RestrictedAccount[]>([]);
+  const [restrictedProviders] = useState<RestrictedAccount[]>([]);
   
   // Adjustment Logs
   const [adjustmentLogs, setAdjustmentLogs] = useState<PenaltyAdjustmentLog[]>([]);
@@ -46,7 +47,6 @@ export default function PenaltiesPage() {
   const [showAdjustModal, setShowAdjustModal] = useState(false);
   const [showSuspensionModal, setShowSuspensionModal] = useState(false);
   const [showResetModal, setShowResetModal] = useState(false);
-  const [showQuickActionsMenu, setShowQuickActionsMenu] = useState(false);
   
   // Suspension Form
   const [suspensionForm, setSuspensionForm] = useState({
@@ -65,11 +65,7 @@ export default function PenaltiesPage() {
     resetValue: '100'
   });
 
-  useEffect(() => {
-    fetchData();
-  }, [activeTab]);
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       setLoading(true);
       setError('');
@@ -100,23 +96,35 @@ export default function PenaltiesPage() {
             console.warn('Unexpected response structure:', response);
             setAdjustmentLogs([]);
           }
-        } catch (logError: any) {
-          console.error('Error fetching adjustment logs:', logError);
-          setError(`Unable to load adjustment logs: ${logError.message || 'Unknown error'}`);
+        } catch (logError) {
+          const error = logError as Error;
+          console.error('Error fetching adjustment logs:', error);
+          setError(`Unable to load adjustment logs: ${error.message || 'Unknown error'}`);
           setAdjustmentLogs([]);
         }
       }
-    } catch (error: any) {
+    } catch (err) {
+      const error = err as Error;
       console.error('Error fetching data:', error);
       setError(error.message || 'Failed to load data. Please try again.');
     } finally {
       setLoading(false);
     }
-  };
+  }, [activeTab]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const handleAdjustPoints = async (adjustmentData: AdjustmentData) => {
     try {
-      const data: any = {
+      const data: {
+        points: number;
+        adjustmentType: 'add' | 'deduct';
+        reason: string;
+        userId?: number;
+        providerId?: number;
+      } = {
         points: adjustmentData.points,
         adjustmentType: adjustmentData.actionType,
         reason: adjustmentData.reason
@@ -132,15 +140,22 @@ export default function PenaltiesPage() {
       alert('Points adjusted successfully!');
       setShowAdjustModal(false);
       fetchData();
-    } catch (error: any) {
+    } catch (err) {
+      const error = err as Error;
       alert(error.message || 'Failed to adjust points');
     }
   };
 
   const handleManageSuspension = async () => {
     try {
-      const data: any = {
-        action: suspensionForm.action,
+      const data: {
+        action: 'suspend' | 'lift';
+        reason: string;
+        userId?: number;
+        providerId?: number;
+        suspensionDays?: number;
+      } = {
+        action: suspensionForm.action as 'suspend' | 'lift',
         reason: suspensionForm.reason
       };
       
@@ -153,14 +168,20 @@ export default function PenaltiesPage() {
       setShowSuspensionModal(false);
       setSuspensionForm({ userId: '', providerId: '', action: 'suspend', reason: '', suspensionDays: '' });
       fetchData();
-    } catch (error: any) {
+    } catch (err) {
+      const error = err as Error;
       alert(error.message || 'Failed to manage suspension');
     }
   };
 
   const handleResetPoints = async () => {
     try {
-      const data: any = {
+      const data: {
+        reason: string;
+        resetValue: number;
+        userId?: number;
+        providerId?: number;
+      } = {
         reason: resetForm.reason,
         resetValue: parseInt(resetForm.resetValue)
       };
@@ -173,22 +194,26 @@ export default function PenaltiesPage() {
       setShowResetModal(false);
       setResetForm({ userId: '', providerId: '', reason: '', resetValue: '100' });
       fetchData();
-    } catch (error: any) {
+    } catch (err) {
+      const error = err as Error;
       alert(error.message || 'Failed to reset points');
     }
   };
 
-  const handleReviewAppeal = async () => {
+  const handleReviewAppeal = async (reviewData: AppealReviewData) => {
     if (!selectedAppeal) return;
     
     try {
-      await penaltyApi.reviewAppeal(selectedAppeal.violation_id, appealReview);
-      alert(`Appeal ${appealReview.approved ? 'approved' : 'rejected'} successfully!`);
+      await penaltyApi.reviewAppeal(selectedAppeal.violation_id, {
+        approved: reviewData.decision === 'approve',
+        reviewNotes: reviewData.reason
+      });
+      alert(`Appeal ${reviewData.decision === 'approve' ? 'approved' : 'rejected'} successfully!`);
       setShowAppealModal(false);
       setSelectedAppeal(null);
-      setAppealReview({ approved: true, reviewNotes: '' });
       fetchData();
-    } catch (error: any) {
+    } catch (err) {
+      const error = err as Error;
       alert(error.message || 'Failed to review appeal');
     }
   };
@@ -210,18 +235,21 @@ export default function PenaltiesPage() {
       setDismissReason('');
       setCustomDismissReason('');
       fetchData();
-    } catch (error: any) {
+    } catch (err) {
+      const error = err as Error;
       alert(error.message || 'Failed to dismiss violation');
     }
   };
 
+  // handleViewDetails is intentionally unused - kept for future feature
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleViewDetails = async (violation: PenaltyViolation) => {
     try {
       const response = await penaltyApi.getViolationDetails(violation.violation_id);
       setSelectedViolation(response.data);
       setShowViolationDetailsModal(true);
-    } catch (error: any) {
-      console.error('Error fetching violation details:', error);
+    } catch (err) {
+      console.error('Error fetching violation details:', err);
       // Fallback to showing current data if API fails
       setSelectedViolation(violation);
       setShowViolationDetailsModal(true);
@@ -300,63 +328,17 @@ export default function PenaltiesPage() {
           <p className="text-gray-600 mt-2">Monitor and manage the penalty point system</p>
         </div>
 
-        {/* Quick Actions Dropdown */}
-        <div className="relative">
+        {/* Adjust Points Button */}
+        <div>
           <button
-            onClick={() => setShowQuickActionsMenu(!showQuickActionsMenu)}
-            className="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 font-semibold shadow-md hover:shadow-lg transition-all duration-200 flex items-center gap-2"
+            onClick={() => setShowAdjustModal(true)}
+            className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 font-semibold shadow-md hover:shadow-lg transition-all duration-200 flex items-center gap-2"
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
             </svg>
-            Quick Actions
-            <svg className={`w-4 h-4 transition-transform ${showQuickActionsMenu ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
+            Adjust Points
           </button>
-
-          {showQuickActionsMenu && (
-            <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-xl border border-gray-200 z-50">
-              <div className="py-1">
-                <button
-                  onClick={() => {
-                    setShowAdjustModal(true);
-                    setShowQuickActionsMenu(false);
-                  }}
-                  className="w-full text-left px-4 py-2.5 hover:bg-blue-50 transition-colors flex items-center gap-3"
-                >
-                  <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                  </svg>
-                  <span className="text-gray-700 font-medium">Adjust Points</span>
-                </button>
-                <button
-                  onClick={() => {
-                    setShowSuspensionModal(true);
-                    setShowQuickActionsMenu(false);
-                  }}
-                  className="w-full text-left px-4 py-2.5 hover:bg-orange-50 transition-colors flex items-center gap-3"
-                >
-                  <svg className="w-5 h-5 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
-                  </svg>
-                  <span className="text-gray-700 font-medium">Manage Suspension</span>
-                </button>
-                <button
-                  onClick={() => {
-                    setShowResetModal(true);
-                    setShowQuickActionsMenu(false);
-                  }}
-                  className="w-full text-left px-4 py-2.5 hover:bg-green-50 transition-colors flex items-center gap-3"
-                >
-                  <svg className="w-5 h-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
-                  <span className="text-gray-700 font-medium">Reset Points</span>
-                </button>
-              </div>
-            </div>
-          )}
         </div>
       </div>
 
@@ -366,7 +348,7 @@ export default function PenaltiesPage() {
           {['dashboard', 'violations', 'appeals', 'logs'].map((tab) => (
             <button
               key={tab}
-              onClick={() => setActiveTab(tab as any)}
+              onClick={() => setActiveTab(tab as 'dashboard' | 'violations' | 'appeals' | 'logs')}
               className={`py-4 px-1 border-b-2 font-medium text-sm capitalize transition-all duration-200 ${
                 activeTab === tab
                   ? 'border-blue-500 text-blue-600 transform scale-105'
@@ -576,7 +558,6 @@ export default function PenaltiesPage() {
                                     </svg>
                                   ),
                                   onClick: () => {
-                                    const id = violation.user_id || violation.provider_id;
                                     const type = violation.user_id ? 'users' : 'service-providers';
                                     window.location.href = `/dashboard/${type}`;
                                   },
@@ -774,10 +755,11 @@ export default function PenaltiesPage() {
                                     className="group relative block bg-white rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-all duration-200 border border-green-200"
                                   >
                                     <div className="aspect-square relative">
-                                      <img
+                                      <Image
                                         src={url}
                                         alt={`Evidence ${index + 1}`}
-                                        className="w-full h-full object-cover"
+                                        fill
+                                        className="object-cover"
                                         onError={(e) => {
                                           const target = e.target as HTMLImageElement;
                                           target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"%3E%3Cpath stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /%3E%3C/svg%3E';
@@ -816,6 +798,10 @@ export default function PenaltiesPage() {
                       <div className="flex justify-end">
                         <button
                           onClick={() => {
+                            console.log('Selected appeal data:', appeal);
+                            console.log('Violation name:', appeal.violation_name);
+                            console.log('Violation type:', appeal.violation_type);
+                            console.log('Violation code:', appeal.violation_code);
                             setSelectedAppeal(appeal);
                             setShowAppealModal(true);
                           }}
@@ -1110,7 +1096,7 @@ export default function PenaltiesPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Action</label>
                 <select
                   value={suspensionForm.action}
-                  onChange={(e) => setSuspensionForm({ ...suspensionForm, action: e.target.value as any })}
+                  onChange={(e) => setSuspensionForm({ ...suspensionForm, action: e.target.value as 'suspend' | 'lift' })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                 >
                   <option value="suspend">Suspend Account</option>
@@ -1238,71 +1224,22 @@ export default function PenaltiesPage() {
       )}
 
       {/* Appeal Review Modal */}
-      {showAppealModal && selectedAppeal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-lg">
-            <h3 className="text-xl font-bold text-gray-900 mb-4">Review Appeal</h3>
-            
-            <div className="mb-4 p-4 bg-gray-50 rounded">
-              <div className="text-sm font-medium text-gray-600 mb-2">Violation:</div>
-              <div className="text-gray-900">{selectedAppeal.violation_name}</div>
-              <div className="text-sm text-gray-500 mt-1">Points: -{selectedAppeal.penalty_points_deducted}</div>
-            </div>
-
-            <div className="mb-4 p-4 bg-gray-50 rounded">
-              <div className="text-sm font-medium text-gray-600 mb-2">Appeal Reason:</div>
-              <div className="text-gray-900">{selectedAppeal.appeal_reason}</div>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Decision</label>
-                <select
-                  value={appealReview.approved ? 'approve' : 'reject'}
-                  onChange={(e) => setAppealReview({ ...appealReview, approved: e.target.value === 'approve' })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                >
-                  <option value="approve">Approve (Restore Points)</option>
-                  <option value="reject">Reject (Keep Penalty)</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Review Notes</label>
-                <textarea
-                  value={appealReview.reviewNotes}
-                  onChange={(e) => setAppealReview({ ...appealReview, reviewNotes: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                  rows={4}
-                  placeholder="Explain your decision"
-                />
-              </div>
-            </div>
-
-            <div className="mt-6 flex gap-3">
-              <button
-                onClick={handleReviewAppeal}
-                disabled={!appealReview.reviewNotes}
-                className={`flex-1 px-4 py-2 text-white rounded-lg disabled:opacity-50 ${
-                  appealReview.approved ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'
-                }`}
-              >
-                {appealReview.approved ? 'Approve Appeal' : 'Reject Appeal'}
-              </button>
-              <button
-                onClick={() => {
-                  setShowAppealModal(false);
-                  setSelectedAppeal(null);
-                  setAppealReview({ approved: true, reviewNotes: '' });
-                }}
-                className="flex-1 px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ReviewAppealModal
+        isOpen={showAppealModal}
+        onClose={() => {
+          setShowAppealModal(false);
+          setSelectedAppeal(null);
+        }}
+        onSubmit={handleReviewAppeal}
+        appeal={selectedAppeal ? {
+          violation_id: selectedAppeal.violation_id,
+          violation_type: selectedAppeal.violation_type?.violation_name || selectedAppeal.violation_name || selectedAppeal.violation_code || 'Violation',
+          points_deducted: selectedAppeal.penalty_points_deducted || selectedAppeal.points_deducted || selectedAppeal.violation_type?.penalty_points || 0,
+          appeal_reason: selectedAppeal.appeal_reason || '',
+          user_name: selectedAppeal.user ? `${selectedAppeal.user.first_name} ${selectedAppeal.user.last_name}` : undefined,
+          provider_name: selectedAppeal.provider ? `${selectedAppeal.provider.provider_first_name} ${selectedAppeal.provider.provider_last_name}` : undefined
+        } : null}
+      />
 
       {/* View Violation Details Modal */}
       {showViolationDetailsModal && selectedViolation && (

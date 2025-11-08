@@ -8,6 +8,26 @@ interface Account {
   name: string;
   type: 'user' | 'provider';
   points?: number;
+  email?: string;
+}
+
+interface UserResponse {
+  user_id: number;
+  user_name?: string;
+  first_name?: string;
+  last_name?: string;
+  points?: number;
+  user_email?: string;
+  email?: string;
+}
+
+interface ProviderResponse {
+  provider_id: number;
+  provider_name?: string;
+  provider_first_name?: string;
+  provider_last_name?: string;
+  points?: number;
+  provider_email?: string;
 }
 
 interface AdjustPointsModalProps {
@@ -77,27 +97,63 @@ export default function AdjustPointsModal({ isOpen, onClose, onSubmit }: AdjustP
       setShowDropdown(true);
 
       try {
+        console.log('Searching for:', searchTerm);
+        
         // Search both users and providers
         const [usersResponse, providersResponse] = await Promise.all([
           adminApi.getUsers({ search: searchTerm, limit: 5 }),
           adminApi.getProviders({ search: searchTerm, limit: 5 })
         ]);
 
-        const users: Account[] = (usersResponse.users || []).map((user: any) => ({
-          id: user.user_id,
-          name: user.user_name,
-          type: 'user' as const,
-          points: user.points
-        }));
+        console.log('Users response:', usersResponse);
+        console.log('Providers response:', providersResponse);
 
-        const providers: Account[] = (providersResponse.providers || []).map((provider: any) => ({
-          id: provider.provider_id,
-          name: provider.provider_name,
-          type: 'provider' as const,
-          points: provider.points
-        }));
+        // Handle different response formats - API might return array directly or wrapped in object
+        const usersArray = Array.isArray(usersResponse) ? usersResponse : (usersResponse.users || usersResponse.data || []);
+        const providersArray = Array.isArray(providersResponse) ? providersResponse : (providersResponse.providers || providersResponse.data || []);
 
-        setSearchResults([...users, ...providers]);
+        console.log('Users array:', usersArray);
+        console.log('Providers array:', providersArray);
+
+        const users: Account[] = (usersArray || [])
+          .filter((user: UserResponse) => user.user_id && (user.user_name || user.first_name))
+          .map((user: UserResponse) => ({
+            id: user.user_id,
+            name: user.user_name || `${user.first_name} ${user.last_name}`.trim(),
+            type: 'user' as const,
+            points: user.points,
+            email: user.user_email || user.email
+          }));
+
+        const providers: Account[] = (providersArray || [])
+          .filter((provider: ProviderResponse) => provider.provider_id && (provider.provider_name || provider.provider_first_name))
+          .map((provider: ProviderResponse) => ({
+            id: provider.provider_id,
+            name: provider.provider_name || `${provider.provider_first_name} ${provider.provider_last_name}`.trim(),
+            type: 'provider' as const,
+            points: provider.points,
+            email: provider.provider_email
+          }));
+
+        // Client-side filtering based on search term
+        const allResults = [...users, ...providers];
+        const searchLower = searchTerm.toLowerCase().trim();
+        const filteredResults = allResults.filter(account => {
+          const nameLower = (account.name || '').toLowerCase();
+          const emailLower = (account.email || '').toLowerCase();
+          const idStr = account.id.toString();
+          
+          return nameLower.includes(searchLower) || 
+                 emailLower.includes(searchLower) || 
+                 idStr.includes(searchLower);
+        });
+
+        console.log('Mapped users:', users);
+        console.log('Mapped providers:', providers);
+        console.log('Total results before filter:', allResults.length);
+        console.log('Filtered results:', filteredResults.length);
+
+        setSearchResults(filteredResults);
       } catch (error) {
         console.error('Error searching accounts:', error);
         setSearchResults([]);
@@ -129,7 +185,7 @@ export default function AdjustPointsModal({ isOpen, onClose, onSubmit }: AdjustP
 
   const handleSelectAccount = (account: Account) => {
     setSelectedAccount(account);
-    setSearchTerm(`${account.type === 'user' ? 'User' : 'Provider'}: ${account.name} (ID: ${account.id})`);
+    setSearchTerm(`${account.type === 'user' ? 'User' : 'Provider'}: ${account.name || 'Unnamed'} (ID: ${account.id})`);
     setShowDropdown(false);
   };
 
@@ -257,7 +313,8 @@ export default function AdjustPointsModal({ isOpen, onClose, onSubmit }: AdjustP
               {showDropdown && !selectedAccount && (
                 <div
                   ref={dropdownRef}
-                  className="absolute z-10 w-full mt-2 bg-white border-2 border-gray-200 rounded-xl shadow-xl max-h-64 overflow-y-auto"
+                  className="absolute z-10 w-full mt-2 bg-white rounded-xl shadow-lg border border-gray-200 max-h-80 overflow-y-auto"
+                  style={{ boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)' }}
                 >
                   {isSearching ? (
                     <div className="px-4 py-8 text-center text-gray-500">
@@ -272,38 +329,85 @@ export default function AdjustPointsModal({ isOpen, onClose, onSubmit }: AdjustP
                       <svg className="w-12 h-12 mx-auto mb-2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M12 12h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
-                      <p className="text-sm">No accounts found</p>
+                      <p className="text-sm font-medium">No accounts found</p>
                       <p className="text-xs text-gray-400 mt-1">Try a different search term</p>
                     </div>
                   ) : (
-                    <div className="py-1">
-                      {searchResults.map((account) => (
-                        <button
-                          key={`${account.type}-${account.id}`}
-                          onClick={() => handleSelectAccount(account)}
-                          className="w-full px-4 py-3 hover:bg-blue-50 transition-colors text-left flex items-center justify-between group"
-                        >
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2">
-                              <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${
-                                account.type === 'user' 
-                                  ? 'bg-blue-100 text-blue-700' 
-                                  : 'bg-purple-100 text-purple-700'
-                              }`}>
-                                {account.type === 'user' ? 'User' : 'Provider'}
-                              </span>
-                              <span className="font-medium text-gray-900">{account.name}</span>
+                    <div className="py-2">
+                      {searchResults.map((account) => {
+                        // Get initials from name
+                        const getInitials = (name: string | undefined) => {
+                          if (!name) return '??';
+                          return name
+                            .split(' ')
+                            .map(word => word[0])
+                            .join('')
+                            .toUpperCase()
+                            .slice(0, 2) || '??';
+                        };
+
+                        const initials = getInitials(account.name);
+                        const isUser = account.type === 'user';
+
+                        return (
+                          <button
+                            key={`${account.type}-${account.id}`}
+                            onClick={() => handleSelectAccount(account)}
+                            className="w-full px-4 py-3 hover:bg-gray-50 transition-all duration-150 text-left flex items-center gap-3 group border-b border-gray-100 last:border-b-0"
+                          >
+                            {/* Avatar/Icon */}
+                            <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center font-semibold text-sm ${
+                              isUser 
+                                ? 'bg-gradient-to-br from-blue-500 to-blue-600 text-white' 
+                                : 'bg-gradient-to-br from-purple-500 to-purple-600 text-white'
+                            }`}>
+                              {isUser ? (
+                                <span>{initials}</span>
+                              ) : (
+                                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a1 1 0 110 2h-3a1 1 0 01-1-1v-2a1 1 0 00-1-1H9a1 1 0 00-1 1v2a1 1 0 01-1 1H4a1 1 0 110-2V4zm3 1h2v2H7V5zm2 4H7v2h2V9zm2-4h2v2h-2V5zm2 4h-2v2h2V9z" clipRule="evenodd" />
+                                </svg>
+                              )}
                             </div>
-                            <p className="text-xs text-gray-500 mt-1">ID: {account.id}</p>
-                          </div>
-                          {account.points !== undefined && (
-                            <div className="text-right">
-                              <p className="text-xs text-gray-500">Current Points</p>
-                              <p className="text-sm font-bold text-gray-900">{account.points}</p>
+
+                            {/* Account Info */}
+                            <div className="flex-1 min-w-0">
+                              {/* Line 1: Name */}
+                              <p className="font-bold text-gray-900 text-sm truncate">
+                                {account.name || 'Unnamed Account'}
+                              </p>
+                              
+                              {/* Line 2: Type, ID, and additional info */}
+                              <div className="flex items-center gap-1.5 text-xs text-gray-600 mt-0.5">
+                                <span className={`font-medium ${isUser ? 'text-blue-600' : 'text-purple-600'}`}>
+                                  {isUser ? 'User' : 'Provider'}
+                                </span>
+                                <span className="text-gray-400">•</span>
+                                <span>ID: {account.id}</span>
+                                {account.email && (
+                                  <>
+                                    <span className="text-gray-400">•</span>
+                                    <span className="truncate max-w-[200px]">{account.email}</span>
+                                  </>
+                                )}
+                                {account.points !== undefined && (
+                                  <>
+                                    <span className="text-gray-400">•</span>
+                                    <span className="font-semibold text-gray-700">{account.points} pts</span>
+                                  </>
+                                )}
+                              </div>
                             </div>
-                          )}
-                        </button>
-                      ))}
+
+                            {/* Right arrow indicator on hover */}
+                            <div className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                              </svg>
+                            </div>
+                          </button>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
@@ -316,7 +420,7 @@ export default function AdjustPointsModal({ isOpen, onClose, onSubmit }: AdjustP
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs font-semibold text-blue-600 uppercase tracking-wide">Selected Account</p>
-                    <p className="text-sm font-bold text-gray-900 mt-1">{selectedAccount.name}</p>
+                    <p className="text-sm font-bold text-gray-900 mt-1">{selectedAccount.name || 'Unnamed Account'}</p>
                     <p className="text-xs text-gray-600">
                       {selectedAccount.type === 'user' ? 'User' : 'Provider'} ID: {selectedAccount.id}
                     </p>
