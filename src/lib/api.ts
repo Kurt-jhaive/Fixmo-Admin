@@ -389,17 +389,26 @@ export const adminApi = {
   },
 
   // Certificate Management
-  async getCertificates(filters: { page?: number; limit?: number; status?: string; provider_id?: number; search?: string } = {}) {
+  async getCertificates(filters: { page?: number; limit?: number; status?: string; certificate_status?: string; provider_id?: number; search?: string } = {}) {
     const params = new URLSearchParams();
     Object.entries(filters).forEach(([key, value]) => {
       if (value !== undefined && value !== '') params.append(key, String(value));
     });
     
+    console.log('📤 API: Sending GET request to /api/admin/certificates with params:', params.toString());
+    
     const response = await fetch(`${API_BASE_URL}/api/admin/certificates?${params}`, {
       headers: getAuthHeaders(),
     });
     if (!response.ok) throw new Error('Failed to fetch certificates');
-    return response.json();
+    const data = await response.json();
+    
+    console.log('📥 API: Received response from backend:', {
+      count: (data.certificates || data || []).length,
+      hasFilters: params.toString() !== ''
+    });
+    
+    return data;
   },
 
   async getCertificateById(certificateId: number) {
@@ -555,7 +564,7 @@ export const adminApi = {
     return data;
   },
 
-  async inviteAdmin(adminData: { email: string; name: string; role: 'admin' | 'super_admin' }) {
+  async inviteAdmin(adminData: { email: string; name: string; role: 'operations' | 'verification' | 'super_admin' }) {
     const response = await fetch(`${API_BASE_URL}/api/admin/`, {
       method: 'POST',
       headers: getAuthHeaders(),
@@ -596,6 +605,11 @@ export const adminApi = {
 };
 
 // Types for better TypeScript support
+export interface AdminInfo {
+  name: string;
+  email: string;
+}
+
 export interface User {
   user_id: number;
   first_name: string;
@@ -613,7 +627,9 @@ export interface User {
   birthday?: string;
   exact_location?: string;
   verified_by_admin_id?: number;
+  verified_by_admin?: AdminInfo | null;
   deactivated_by_admin_id?: number;
+  deactivated_by_admin?: AdminInfo | null;
   verification_reviewed_at?: string;
 }
 
@@ -636,7 +652,9 @@ export interface ServiceProvider {
   provider_birthday?: string;
   provider_exact_location?: string;
   verified_by_admin_id?: number;
+  verified_by_admin?: AdminInfo | null;
   deactivated_by_admin_id?: number;
+  deactivated_by_admin?: AdminInfo | null;
   verification_reviewed_at?: string;
 }
 
@@ -658,7 +676,7 @@ export interface Admin {
   username: string;
   email: string;
   name: string;
-  role: 'admin' | 'super_admin';
+  role: 'operations' | 'verification' | 'super_admin';
   is_active: boolean;
   must_change_password: boolean;
   created_at: string;
@@ -1414,19 +1432,22 @@ export const getAdminName = async (adminId: number | null | undefined): Promise<
   // Check cache first
   if (adminCache.has(adminId)) {
     const admin = adminCache.get(adminId)!;
-    return `${admin.name} (ID: ${adminId})`;
+    return admin.name; // Return just the name, not including ID
   }
   
   // Fetch from API
   try {
+    console.log('🔍 Fetching admin name for ID:', adminId);
     const admin = await adminApi.getAdminById(adminId);
-    if (admin) {
-      adminCache.set(adminId, { name: admin.name, email: admin.email });
-      return `${admin.name} (ID: ${adminId})`;
+    console.log('✅ Admin data received:', admin);
+    if (admin && admin.name) {
+      adminCache.set(adminId, { name: admin.name, email: admin.email || '' });
+      return admin.name; // Return just the name
     }
   } catch (error) {
-    console.error('Error fetching admin:', error);
+    console.error('❌ Error fetching admin name for ID', adminId, ':', error);
   }
   
-  return `Admin ID: ${adminId}`;
+  // Fallback - return just the ID if name can't be fetched
+  return `Admin ${adminId}`;
 };

@@ -1,9 +1,14 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { adminApi, exportApi, getAdminName, authApi, type User } from "@/lib/api";
+import { adminApi, exportApi, type User } from "@/lib/api";
 import SmartImage from "@/components/SmartImage";
+import KebabMenu, { KebabButton, type KebabMenuItem } from "@/components/ui/KebabMenu";
+import ReviewUserModal from "@/components/dashboard/ReviewUserModal";
+import VerifyAccountModal from "@/components/dashboard/VerifyAccountModal";
 import type { ReasonsData } from "@/types/reasons";
+import { useRBAC } from "@/lib/useRBAC";
+import { ViewOnlyBanner } from "@/components/ViewOnlyBanner";
 
 // Import reasons data directly
 const reasonsData: ReasonsData = {
@@ -37,27 +42,62 @@ const reasonsData: ReasonsData = {
   ]
 };
 
-// Admin Name Display Component
-function AdminName({ adminId }: { adminId: number | null | undefined }) {
-  const [adminName, setAdminName] = useState<string>('Loading...');
+// Admin Name Display Component - Now uses data from API response
+function AdminName({ adminInfo }: { adminInfo?: { name: string; email: string } | null }) {
+  if (!adminInfo) return <span>—</span>;
+  return <span>{adminInfo.name}</span>;
+}
 
-  useEffect(() => {
-    if (adminId) {
-      getAdminName(adminId).then(setAdminName);
-    } else {
-      setAdminName('—');
-    }
-  }, [adminId]);
+// Admin Avatar Component - Shows initials in avatar
+function AdminAvatar({ adminInfo }: { adminInfo?: { name: string; email: string } | null }) {
+  if (!adminInfo) return <span>—</span>;
 
-  return <span>{adminName}</span>;
+  // Get initials from name
+  const getInitials = (name: string) => {
+    return name.split(' ').map((n) => n[0]).join('').substring(0, 2).toUpperCase();
+  };
+
+  return <span>{getInitials(adminInfo.name)}</span>;
+}
+
+// Helper function to get primary status
+function getPrimaryStatus(user: User): { label: string; color: string } {
+  // Priority: Pending Verification > Deactivated > Inactive > Active
+  if (!user.is_verified && user.verification_status !== 'rejected') {
+    return { label: 'Pending Verification', color: 'yellow' };
+  }
+  if (!user.is_activated) {
+    return { label: 'Deactivated', color: 'red' };
+  }
+  if (user.verification_status === 'rejected') {
+    return { label: 'Rejected', color: 'gray' };
+  }
+  return { label: 'Active', color: 'green' };
+}
+
+// Status Badge Component
+function StatusBadge({ status }: { status: { label: string; color: string } }) {
+  const colorClasses = {
+    yellow: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+    green: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+    red: 'bg-rose-100 text-rose-800 border-rose-200',
+    gray: 'bg-gray-100 text-gray-800 border-gray-200',
+  };
+
+  return (
+    <span className={`inline-flex items-center px-3 py-1 text-xs font-semibold rounded-full border ${colorClasses[status.color as keyof typeof colorClasses]}`}>
+      {status.label}
+    </span>
+  );
 }
 
 export default function UsersPage() {
+  const { canEdit, canApprove, canReject } = useRBAC('users');
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [showModal, setShowModal] = useState(false);
-  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [openMenuId, setOpenMenuId] = useState<number | null>(null);
   const [filters, setFilters] = useState({
     search: "",
     verified: undefined as boolean | undefined,
@@ -76,7 +116,16 @@ export default function UsersPage() {
   });
   const [exporting, setExporting] = useState(false);
 
- 
+  // Modal States
+  const [showRejectModal, setShowRejectModal] = useState(false);
+  const [showDeactivateModal, setShowDeactivateModal] = useState(false);
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [showVerifyModal, setShowVerifyModal] = useState(false);
+  const [actionUser, setActionUser] = useState<User | null>(null);
+  const [rejectionReason, setRejectionReason] = useState("");
+  const [deactivationReason, setDeactivationReason] = useState("");
+  const [customReason, setCustomReason] = useState("");
+  const [showCustomReason, setShowCustomReason] = useState(false);
 
   // Helper function to clean user image URLs
   const cleanUserUrls = (user: User): User => {
@@ -86,87 +135,70 @@ export default function UsersPage() {
       valid_id: user.valid_id
     };
   };
-  
-  // Rejection/Deactivation Modal States
-  const [showRejectModal, setShowRejectModal] = useState(false);
-  const [showDeactivateModal, setShowDeactivateModal] = useState(false);
-  const [showApproveModal, setShowApproveModal] = useState(false);
-  const [actionUser, setActionUser] = useState<User | null>(null);
-  const [rejectionReason, setRejectionReason] = useState("");
-  const [deactivationReason, setDeactivationReason] = useState("");
-  const [customReason, setCustomReason] = useState("");
-  const [showCustomReason, setShowCustomReason] = useState(false);
-
-  useEffect(() => {
-    const user = authApi.getStoredUser();
-    setIsSuperAdmin(user?.role === 'super_admin');
-  }, []);
 
   const fetchUsers = useCallback(async () => {
     try {
       setLoading(true);
       
-      // FORCE TRY REAL API FIRST - remove connection test for debugging
       console.log('🚀 Attempting to fetch from real API...');
       try {
         const data = await adminApi.getUsers(filters);
         console.log('✅ Real API Success! Data:', data);
-        console.log('� Users array:', data.users || data);
         
         const usersArray = data.users || data || [];
         console.log('👤 Users count:', usersArray.length);
         if (usersArray.length > 0) {
-          console.log('👤 First user:', usersArray[0]);
-          console.log('👤 First user profile_photo:', usersArray[0]?.profile_photo);
+          console.log('👤 First user sample:', usersArray[0]);
+          console.log('👤 First user verified_by_admin_id:', usersArray[0]?.verified_by_admin_id);
+          console.log('👤 First user verification_reviewed_at:', usersArray[0]?.verification_reviewed_at);
         }
         
-        // Clean image URLs to remove /uploads/ prefix if present
         const cleanedUsers = usersArray.map(cleanUserUrls);
         setUsers(cleanedUsers);
-        return; // Exit early if successful
+        return;
       } catch (apiError) {
         console.error('❌ Real API failed:', apiError);
       }
       
-      // If we get here, the real API failed, so use mock data
+      // Fallback mock data
       console.warn('📋 Using mock data as fallback');
       setUsers([
-          {
-            user_id: 1,
-            first_name: "John",
-            last_name: "Doe",
-            email: "john.doe@example.com",
-            phone_number: "+1234567890",
-            profile_photo: "https://res.cloudinary.com/dcx1glkit/image/upload/v1757846167/fixmo/customer-profiles/customer_profile_ejmercado0544_gmail_com_1757846164476.jpg",
-            valid_id: "https://res.cloudinary.com/dcx1glkit/image/upload/v1757846167/fixmo/documents/valid_id_sample.jpg",
-            user_location: "New York",
-            created_at: new Date().toISOString(),
-            is_verified: true,
-            userName: "johndoe",
-            is_activated: true,
-            birthday: "1990-01-01",
-            exact_location: "123 Main St, New York"
-          },
-          {
-            user_id: 2,
-            first_name: "Jane",
-            last_name: "Smith",
-            email: "jane.smith@example.com",
-            phone_number: "+1234567891",
-            profile_photo: "https://res.cloudinary.com/demo/image/upload/c_scale,w_100,h_100/woman.jpg",
-            valid_id: "https://res.cloudinary.com/demo/image/upload/c_scale,w_300,h_200/sample.jpg",
-            user_location: "Los Angeles",
-            created_at: new Date().toISOString(),
-            is_verified: false,
-            userName: "janesmith",
-            is_activated: true,
-            birthday: "1992-05-15",
-            exact_location: "456 Oak Ave, Los Angeles"
-          }
-        ]);
+        {
+          user_id: 1,
+          first_name: "John",
+          last_name: "Doe",
+          email: "john.doe@example.com",
+          phone_number: "+1234567890",
+          profile_photo: "https://res.cloudinary.com/dcx1glkit/image/upload/v1757846167/fixmo/customer-profiles/customer_profile_ejmercado0544_gmail_com_1757846164476.jpg",
+          valid_id: "https://res.cloudinary.com/dcx1glkit/image/upload/v1757846167/fixmo/documents/valid_id_sample.jpg",
+          user_location: "New York",
+          created_at: new Date().toISOString(),
+          is_verified: true,
+          userName: "johndoe",
+          is_activated: true,
+          birthday: "1990-01-01",
+          exact_location: "123 Main St, New York"
+        },
+        {
+          user_id: 2,
+          first_name: "Jane",
+          last_name: "Smith",
+          email: "jane.smith@example.com",
+          phone_number: "+1234567891",
+          profile_photo: "https://res.cloudinary.com/demo/image/upload/c_scale,w_100,h_100/woman.jpg",
+          valid_id: "https://res.cloudinary.com/demo/image/upload/c_scale,w_300,h_200/sample.jpg",
+          user_location: "Los Angeles",
+          created_at: new Date().toISOString(),
+          is_verified: false,
+          userName: "janesmith",
+          is_activated: true,
+          birthday: "1992-05-15",
+          exact_location: "456 Oak Ave, Los Angeles"
+        }
+      ]);
     } catch (error) {
       console.error("Failed to fetch users:", error);
-      setUsers([]); // Empty array on error
+      setUsers([]);
     } finally {
       setLoading(false);
     }
@@ -176,12 +208,32 @@ export default function UsersPage() {
     fetchUsers();
   }, [fetchUsers]);
 
+  const handleVerificationDecision = async (decision: 'approve' | 'reject', reason: string) => {
+    if (!actionUser) return;
+
+    try {
+      if (decision === 'approve') {
+        await adminApi.verifyUser(actionUser.user_id);
+      } else {
+        await adminApi.rejectUser(actionUser.user_id, reason);
+      }
+      fetchUsers();
+      setShowVerifyModal(false);
+      setActionUser(null);
+      setOpenMenuId(null);
+    } catch (error) {
+      console.error(`Failed to ${decision} user:`, error);
+      alert(error instanceof Error ? error.message : `Failed to ${decision} user`);
+    }
+  };
+
   const handleVerifyUser = async (userId: number) => {
     try {
       await adminApi.verifyUser(userId);
-      fetchUsers(); // Refresh data
-      setShowApproveModal(false);
+      fetchUsers();
+      setShowReviewModal(false);
       setActionUser(null);
+      setOpenMenuId(null);
     } catch (error) {
       console.error("Failed to verify user:", error);
       alert(error instanceof Error ? error.message : 'Failed to approve user');
@@ -190,7 +242,8 @@ export default function UsersPage() {
 
   const handleApproveClick = (user: User) => {
     setActionUser(user);
-    setShowApproveModal(true);
+    setShowReviewModal(true);
+    setOpenMenuId(null);
   };
 
   const handleRejectUser = (user: User) => {
@@ -199,6 +252,7 @@ export default function UsersPage() {
     setCustomReason("");
     setShowCustomReason(false);
     setShowRejectModal(true);
+    setOpenMenuId(null);
   };
 
   const handleDeactivateUser = (user: User) => {
@@ -207,6 +261,61 @@ export default function UsersPage() {
     setCustomReason("");
     setShowCustomReason(false);
     setShowDeactivateModal(true);
+    setOpenMenuId(null);
+  };
+
+  const confirmRejectUser = async () => {
+    if (!actionUser) return;
+    
+    const finalReason = showCustomReason ? customReason : rejectionReason;
+    if (!finalReason.trim()) {
+      alert("Please select or enter a rejection reason");
+      return;
+    }
+
+    try {
+      await adminApi.rejectUser(actionUser.user_id, finalReason);
+      setShowRejectModal(false);
+      setActionUser(null);
+      fetchUsers();
+    } catch (error) {
+      console.error("Failed to reject user:", error);
+    }
+  };
+
+  const confirmDeactivateUser = async () => {
+    if (!actionUser) return;
+    
+    const finalReason = showCustomReason ? customReason : deactivationReason;
+    if (!finalReason.trim()) {
+      alert("Please select or enter a deactivation reason");
+      return;
+    }
+
+    try {
+      await adminApi.deactivateUser(actionUser.user_id, finalReason);
+      setShowDeactivateModal(false);
+      setActionUser(null);
+      fetchUsers();
+    } catch (error) {
+      console.error("Failed to deactivate user:", error);
+    }
+  };
+
+  const handleActivateUser = async (userId: number) => {
+    try {
+      await adminApi.activateUser(userId);
+      setOpenMenuId(null);
+      fetchUsers();
+    } catch (error) {
+      console.error("Failed to activate user:", error);
+    }
+  };
+
+  const viewUserDetails = (user: User) => {
+    setSelectedUser(user);
+    setShowModal(true);
+    setOpenMenuId(null);
   };
 
   const handleExport = async () => {
@@ -230,7 +339,6 @@ export default function UsersPage() {
 
       const blob = await exportApi.exportUsers(exportParams);
       
-      // Create download link
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -250,169 +358,160 @@ export default function UsersPage() {
     }
   };
 
-  const confirmRejectUser = async () => {
-    if (!actionUser) return;
+  // Get kebab menu items for a user
+  const getKebabMenuItems = (user: User): KebabMenuItem[] => {
+    const isPending = !user.is_verified && user.verification_status !== 'rejected';
     
-    const finalReason = showCustomReason ? customReason : rejectionReason;
-    if (!finalReason.trim()) {
-      alert("Please select or enter a rejection reason");
-      return;
-    }
-
-    try {
-      await adminApi.rejectUser(actionUser.user_id, finalReason);
-      setShowRejectModal(false);
-      setActionUser(null);
-      fetchUsers(); // Refresh data
-    } catch (error) {
-      console.error("Failed to reject user:", error);
-    }
+    return [
+      {
+        label: 'View Profile',
+        icon: (
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+          </svg>
+        ),
+        onClick: () => viewUserDetails(user),
+        variant: 'primary',
+      },
+      {
+        label: 'Verify Account',
+        icon: (
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        ),
+        onClick: () => handleApproveClick(user),
+        variant: 'success',
+        hidden: !isPending || !canApprove,
+      },
+      {
+        label: 'Reject Verification',
+        icon: (
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        ),
+        onClick: () => handleRejectUser(user),
+        variant: 'danger',
+        hidden: !isPending || !canReject,
+      },
+      {
+        label: user.is_activated ? 'Deactivate Account' : 'Activate Account',
+        icon: user.is_activated ? (
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+          </svg>
+        ) : (
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        ),
+        onClick: () => {
+          if (user.is_activated) {
+            handleDeactivateUser(user);
+          } else {
+            handleActivateUser(user.user_id);
+          }
+        },
+        variant: user.is_activated ? 'danger' : 'success',
+        hidden: !canEdit,
+      },
+    ];
   };
 
-  const confirmDeactivateUser = async () => {
-    if (!actionUser) return;
-    
-    const finalReason = showCustomReason ? customReason : deactivationReason;
-    if (!finalReason.trim()) {
-      alert("Please select or enter a deactivation reason");
-      return;
-    }
+  // Filter users based on search and filters
+  const filteredUsers = users.filter((user) => {
+    const matchesSearch = filters.search === "" || 
+      user.first_name.toLowerCase().includes(filters.search.toLowerCase()) ||
+      user.last_name.toLowerCase().includes(filters.search.toLowerCase()) ||
+      user.email.toLowerCase().includes(filters.search.toLowerCase()) ||
+      user.phone_number.includes(filters.search);
 
-    try {
-      await adminApi.deactivateUser(actionUser.user_id, finalReason);
-      setShowDeactivateModal(false);
-      setActionUser(null);
-      fetchUsers(); // Refresh data
-    } catch (error) {
-      console.error("Failed to deactivate user:", error);
-    }
-  };
+    const matchesVerified = filters.verified === undefined || user.is_verified === filters.verified;
+    const matchesActive = filters.active === undefined || user.is_activated === filters.active;
 
-  const handleActivateUser = async (userId: number, activate: boolean) => {
-    try {
-      if (activate) {
-        await adminApi.activateUser(userId);
-        fetchUsers(); // Refresh data
-      } else {
-        // For deactivation, show modal to get reason
-        const user = users.find(u => u.user_id === userId);
-        if (user) {
-          handleDeactivateUser(user);
-        }
-      }
-    } catch (error) {
-      console.error("Failed to update user status:", error);
-    }
-  };
-
-  const viewUserDetails = async (user: User) => {
-    try {
-      const data = await adminApi.getUserById(user.user_id);
-      setSelectedUser(data.user);
-      setShowModal(true);
-    } catch (error) {
-      console.error("Failed to fetch user details:", error);
-    }
-  };
-
-  // Filter users based on search and filter criteria
-  const filteredUsers = users.filter(user => {
-    // Search filter
-    if (filters.search) {
-      const searchLower = filters.search.toLowerCase();
-      const matchesSearch = 
-        (user.first_name && user.first_name.toLowerCase().includes(searchLower)) ||
-        (user.last_name && user.last_name.toLowerCase().includes(searchLower)) ||
-        (user.email && user.email.toLowerCase().includes(searchLower)) ||
-        (user.userName && user.userName.toLowerCase().includes(searchLower)) ||
-        (user.phone_number && user.phone_number.includes(searchLower)) ||
-        (user.user_location && user.user_location.toLowerCase().includes(searchLower));
-      
-      if (!matchesSearch) return false;
-    }
-    
-    // Verification status filter
-    if (filters.verified !== undefined && user.is_verified !== filters.verified) {
-      return false;
-    }
-    
-    // Active status filter
-    if (filters.active !== undefined && user.is_activated !== filters.active) {
-      return false;
-    }
-    
-    return true;
+    return matchesSearch && matchesVerified && matchesActive;
   });
 
   return (
-    <div className="space-y-6 p-6">
-      {/* Page Header */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-        <div className="px-6 py-5">
-          <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">User Management</h1>
-              <p className="text-gray-600 mt-1">Manage customer accounts and verification status</p>
-            </div>
-            <div className="flex items-center space-x-4">
-              <div className="bg-blue-50 px-4 py-2 rounded-lg border border-blue-200">
-                <span className="text-sm text-blue-700">Total Users: </span>
-                <span className="font-semibold text-blue-900">{users.length}</span>
-              </div>
-              <div className="bg-green-50 px-4 py-2 rounded-lg border border-green-200">
-                <span className="text-sm text-green-700">Filtered: </span>
-                <span className="font-semibold text-green-900">{filteredUsers.length}</span>
-              </div>
-            </div>
-          </div>
+    <div className="p-6 space-y-6">
+      <ViewOnlyBanner module="users" />
+      
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">User Management</h1>
+          <p className="text-gray-600 mt-1">Manage and verify user accounts</p>
         </div>
+        <button
+          onClick={() => setShowExportModal(true)}
+          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+          Export Data
+        </button>
       </div>
 
       {/* Filters */}
-      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-          <input
-            type="text"
-            placeholder="Search users..."
-            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
-            value={filters.search}
-            onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-          />
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+        <div className="flex flex-col lg:flex-row gap-4">
+          {/* Search */}
+          <div className="flex-1">
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Search by name, email, or phone..."
+                value={filters.search}
+                onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+              <svg
+                className="absolute left-3 top-2.5 h-5 w-5 text-gray-400"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </div>
+          </div>
+
+          {/* Verification Status Filter */}
           <select
-            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
-            value={filters.verified === undefined ? "" : filters.verified.toString()}
-            onChange={(e) => setFilters({ ...filters, verified: e.target.value === "" ? undefined : e.target.value === "true" })}
+            value={filters.verified === undefined ? "" : filters.verified ? "verified" : "unverified"}
+            onChange={(e) => setFilters({ 
+              ...filters, 
+              verified: e.target.value === "" ? undefined : e.target.value === "verified" 
+            })}
+            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           >
             <option value="">All Verification Status</option>
-            <option value="true">Verified</option>
-            <option value="false">Unverified</option>
+            <option value="verified">Verified</option>
+            <option value="unverified">Unverified</option>
           </select>
+
+          {/* Active Status Filter */}
           <select
-            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
-            value={filters.active === undefined ? "" : filters.active.toString()}
-            onChange={(e) => setFilters({ ...filters, active: e.target.value === "" ? undefined : e.target.value === "true" })}
+            value={filters.active === undefined ? "" : filters.active ? "active" : "inactive"}
+            onChange={(e) => setFilters({ 
+              ...filters, 
+              active: e.target.value === "" ? undefined : e.target.value === "active" 
+            })}
+            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           >
             <option value="">All Active Status</option>
-            <option value="true">Active</option>
-            <option value="false">Inactive</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
           </select>
-          <button
-            onClick={fetchUsers}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            Refresh
-          </button>
-          {isSuperAdmin && (
-            <button
-              onClick={() => setShowExportModal(true)}
-              className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 flex items-center justify-center"
-            >
-              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-              Export
-            </button>
-          )}
+        </div>
+
+        {/* Results count */}
+        <div className="mt-3 text-sm text-gray-600">
+          Showing <span className="font-semibold text-gray-900">{filteredUsers.length}</span> of{" "}
+          <span className="font-semibold text-gray-900">{users.length}</span> users
         </div>
       </div>
 
@@ -452,111 +551,90 @@ export default function UsersPage() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {filteredUsers.map((user) => (
-                  <tr key={user.user_id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <div className="h-10 w-10 flex-shrink-0">
-                          <SmartImage
-                            src={user.profile_photo}
-                            alt={`${user.first_name} ${user.last_name}`}
-                            width={40}
-                            height={40}
-                            className="h-10 w-10 rounded-full object-cover"
-                            fallbackType="profile"
-                            fallbackContent={
-                              <div className="h-10 w-10 rounded-full bg-gray-300 flex items-center justify-center">
-                                <span className="text-sm font-medium text-gray-700">
-                                  {user.first_name[0]}{user.last_name[0]}
-                                </span>
-                              </div>
-                            }
-                          />
-                        </div>
-                        <div className="ml-4">
-                          <div className="text-sm font-medium text-gray-900">
-                            {user.first_name} {user.last_name}
+                {filteredUsers.map((user) => {
+                  const primaryStatus = getPrimaryStatus(user);
+                  
+                  return (
+                    <tr key={user.user_id} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <div className="h-10 w-10 flex-shrink-0">
+                            <SmartImage
+                              src={user.profile_photo}
+                              alt={`${user.first_name} ${user.last_name}`}
+                              width={40}
+                              height={40}
+                              className="h-10 w-10 rounded-full object-cover ring-2 ring-gray-100"
+                              fallbackType="profile"
+                              fallbackContent={
+                                <div className="h-10 w-10 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center ring-2 ring-gray-100">
+                                  <span className="text-sm font-semibold text-white">
+                                    {user.first_name[0]}{user.last_name[0]}
+                                  </span>
+                                </div>
+                              }
+                            />
                           </div>
-                          <div className="text-sm text-gray-500">@{user.userName}</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">{user.email}</div>
-                      <div className="text-sm text-gray-500">{user.phone_number}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">{user.user_location || "—"}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex flex-col space-y-1">
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                          user.is_verified 
-                            ? "bg-green-100 text-green-800" 
-                            : "bg-yellow-100 text-yellow-800"
-                        }`}>
-                          {user.is_verified ? "Verified" : "Unverified"}
-                        </span>
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                          user.is_activated 
-                            ? "bg-blue-100 text-blue-800" 
-                            : "bg-red-100 text-red-800"
-                        }`}>
-                          {user.is_activated ? "Active" : "Inactive"}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {user.verified_by_admin_id ? (
-                        <div>
-                          <div className="text-sm font-medium text-gray-900">
-                            <AdminName adminId={user.verified_by_admin_id} />
-                          </div>
-                          {user.verification_reviewed_at && (
-                            <div className="text-xs text-gray-500">
-                              {new Date(user.verification_reviewed_at).toLocaleDateString()}
+                          <div className="ml-4">
+                            <div className="text-sm font-semibold text-gray-900">
+                              {user.first_name} {user.last_name}
                             </div>
-                          )}
+                            <div className="text-sm text-gray-500">@{user.userName}</div>
+                          </div>
                         </div>
-                      ) : (
-                        <span className="text-sm text-gray-400">—</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {new Date(user.created_at).toLocaleDateString()}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
-                      <button
-                        onClick={() => viewUserDetails(user)}
-                        className="text-blue-600 hover:text-blue-900 font-medium"
-                      >
-                        View
-                      </button>
-                      {!user.is_verified && user.verification_status !== 'rejected' && (
-                        <>
-                          <button
-                            onClick={() => handleApproveClick(user)}
-                            className="text-green-600 hover:text-green-900 font-medium"
-                          >
-                            Verify
-                          </button>
-                          <button
-                            onClick={() => handleRejectUser(user)}
-                            className="text-red-600 hover:text-red-900 font-medium"
-                          >
-                            Reject
-                          </button>
-                        </>
-                      )}
-                      <button
-                        onClick={() => handleActivateUser(user.user_id, !user.is_activated)}
-                        className={`font-medium ${user.is_activated ? "text-red-600 hover:text-red-900" : "text-green-600 hover:text-green-900"}`}
-                      >
-                        {user.is_activated ? "Deactivate" : "Activate"}
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">{user.email}</div>
+                        <div className="text-sm text-gray-500">{user.phone_number}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">{user.user_location || "—"}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <StatusBadge status={primaryStatus} />
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {user.verified_by_admin ? (
+                          <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white font-semibold text-xs">
+                              <AdminAvatar adminInfo={user.verified_by_admin} />
+                            </div>
+                            <div className="flex flex-col">
+                              <span className="font-medium text-gray-900 text-sm">
+                                <AdminName adminInfo={user.verified_by_admin} />
+                              </span>
+                              {user.verification_reviewed_at && (
+                                <span className="text-xs text-gray-500">
+                                  {new Date(user.verification_reviewed_at).toLocaleDateString()}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-sm text-gray-400">—</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {new Date(user.created_at).toLocaleDateString()}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium relative">
+                        <KebabButton
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setOpenMenuId(openMenuId === user.user_id ? null : user.user_id);
+                          }}
+                          isOpen={openMenuId === user.user_id}
+                        />
+                        <KebabMenu
+                          items={getKebabMenuItems(user)}
+                          isOpen={openMenuId === user.user_id}
+                          onClose={() => setOpenMenuId(null)}
+                          position="right"
+                        />
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -564,7 +642,13 @@ export default function UsersPage() {
 
         {!loading && filteredUsers.length === 0 && (
           <div className="p-8 text-center text-gray-500">
-            {users.length === 0 ? "No users found." : "No users found matching your criteria."}
+            <svg className="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+            </svg>
+            <p className="text-lg font-medium text-gray-900">No users found</p>
+            <p className="mt-1 text-sm text-gray-500">
+              {users.length === 0 ? "No users in the system yet." : "Try adjusting your filters."}
+            </p>
           </div>
         )}
       </div>
@@ -611,21 +695,8 @@ export default function UsersPage() {
                       {selectedUser.first_name} {selectedUser.last_name}
                     </h4>
                     <p className="text-lg text-gray-600">@{selectedUser.userName}</p>
-                    <div className="flex space-x-3 mt-2">
-                      <span className={`inline-flex px-3 py-1 text-sm font-semibold rounded-full ${
-                        selectedUser.is_verified 
-                          ? "bg-green-100 text-green-800" 
-                          : "bg-yellow-100 text-yellow-800"
-                      }`}>
-                        {selectedUser.is_verified ? "✓ Verified" : "⚠ Unverified"}
-                      </span>
-                      <span className={`inline-flex px-3 py-1 text-sm font-semibold rounded-full ${
-                        selectedUser.is_activated 
-                          ? "bg-blue-100 text-blue-800" 
-                          : "bg-red-100 text-red-800"
-                      }`}>
-                        {selectedUser.is_activated ? "● Active" : "● Inactive"}
-                      </span>
+                    <div className="flex flex-wrap gap-2 mt-3">
+                      <StatusBadge status={getPrimaryStatus(selectedUser)} />
                     </div>
                   </div>
                 </div>
@@ -657,7 +728,7 @@ export default function UsersPage() {
                 </div>
 
                 {/* Admin Action Tracking */}
-                {(selectedUser.verified_by_admin_id || selectedUser.deactivated_by_admin_id) && (
+                {(selectedUser.verified_by_admin || selectedUser.deactivated_by_admin) && (
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                     <h4 className="font-semibold text-blue-900 mb-3 flex items-center">
                       <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
@@ -666,13 +737,21 @@ export default function UsersPage() {
                       Admin Action History
                     </h4>
                     <div className="space-y-2 text-sm">
-                      {selectedUser.verified_by_admin_id && (
-                        <div className="flex justify-between">
-                          <span className="text-gray-700">Verified by:</span>
-                          <span className="font-medium text-gray-900">
-                            <AdminName adminId={selectedUser.verified_by_admin_id} />
-                          </span>
-                        </div>
+                      {selectedUser.verified_by_admin && (
+                        <>
+                          <div className="flex justify-between">
+                            <span className="text-gray-700">Verified by:</span>
+                            <span className="font-medium text-gray-900">
+                              {selectedUser.verified_by_admin.name}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-700">Admin Email:</span>
+                            <span className="font-medium text-gray-900">
+                              {selectedUser.verified_by_admin.email}
+                            </span>
+                          </div>
+                        </>
                       )}
                       {selectedUser.verification_reviewed_at && (
                         <div className="flex justify-between">
@@ -682,13 +761,21 @@ export default function UsersPage() {
                           </span>
                         </div>
                       )}
-                      {selectedUser.deactivated_by_admin_id && (
-                        <div className="flex justify-between">
-                          <span className="text-gray-700">Deactivated by:</span>
-                          <span className="font-medium text-gray-900">
-                            <AdminName adminId={selectedUser.deactivated_by_admin_id} />
-                          </span>
-                        </div>
+                      {selectedUser.deactivated_by_admin && (
+                        <>
+                          <div className="flex justify-between">
+                            <span className="text-gray-700">Deactivated by:</span>
+                            <span className="font-medium text-gray-900">
+                              {selectedUser.deactivated_by_admin.name}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-700">Admin Email:</span>
+                            <span className="font-medium text-gray-900">
+                              {selectedUser.deactivated_by_admin.email}
+                            </span>
+                          </div>
+                        </>
                       )}
                     </div>
                   </div>
@@ -698,256 +785,198 @@ export default function UsersPage() {
                 {selectedUser.valid_id && (
                   <div className="bg-gray-50 p-4 rounded-lg">
                     <label className="block text-sm font-semibold text-gray-700 mb-3">Valid ID Document</label>
-                    <div className="flex justify-center">
-                      <SmartImage
-                        src={selectedUser.valid_id}
-                        alt="User Valid ID"
-                        width={400}
-                        height={250}
-                        className="border-2 border-gray-300 rounded-lg object-cover shadow-md max-w-full h-auto"
-                        fallbackType="document"
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {/* Action Buttons */}
-                <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
-                  <button
-                    onClick={() => setShowModal(false)}
-                    className="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium"
-                  >
-                    Close
-                  </button>
-                  {!selectedUser.is_verified && (
-                    <button
-                      onClick={() => {
-                        setShowModal(false);
-                        handleApproveClick(selectedUser);
-                      }}
-                      className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium"
-                    >
-                      Verify User
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* User Approve Confirmation Modal */}
-      {showApproveModal && actionUser && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
-            <div className="p-6">
-              <div className="flex items-center justify-center w-12 h-12 mx-auto bg-green-100 rounded-full mb-4">
-                <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
-              <h3 className="text-lg font-semibold text-center mb-2">Approve User Verification</h3>
-              <p className="text-sm text-gray-600 text-center mb-4">
-                Are you sure you want to approve the verification for <strong>{actionUser.first_name} {actionUser.last_name}</strong>?
-              </p>
-              <div className="bg-gray-50 rounded-lg p-4 mb-4">
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                  <div className="text-gray-600">Email:</div>
-                  <div className="font-medium">{actionUser.email}</div>
-                  <div className="text-gray-600">Phone:</div>
-                  <div className="font-medium">{actionUser.phone_number}</div>
-                  <div className="text-gray-600">Username:</div>
-                  <div className="font-medium">{actionUser.userName}</div>
-                  <div className="text-gray-600">Location:</div>
-                  <div className="font-medium">{actionUser.user_location || 'N/A'}</div>
-                </div>
-              </div>
-              <div className="flex gap-3">
-                <button
-                  onClick={() => {
-                    setShowApproveModal(false);
-                    setActionUser(null);
-                  }}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => handleVerifyUser(actionUser.user_id)}
-                  className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                >
-                  Approve Verification
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* User Rejection Modal */}
-      {showRejectModal && actionUser && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="relative mx-auto border w-11/12 md:w-1/2 lg:w-1/3 shadow-lg rounded-md bg-white max-h-[90vh] overflow-y-auto">
-            <div className="p-5">
-              <div className="mt-3">
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-lg font-medium text-gray-900">Reject User Verification</h3>
-                  <button
-                    onClick={() => setShowRejectModal(false)}
-                    className="text-gray-400 hover:text-gray-600"
-                  >
-                    ✕
-                  </button>
-                </div>
-              </div>
-              
-              <div className="space-y-4">
-                <p className="text-sm text-gray-600">
-                  You are rejecting the verification for: <strong>{actionUser.first_name} {actionUser.last_name}</strong>
-                </p>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Rejection Reason
-                  </label>
-                  <select
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
-                    value={showCustomReason ? "custom" : rejectionReason}
-                    onChange={(e) => {
-                      if (e.target.value === "custom") {
-                        setShowCustomReason(true);
-                        setRejectionReason("");
-                      } else {
-                        setShowCustomReason(false);
-                        setRejectionReason(e.target.value);
-                      }
-                    }}
-                  >
-                    <option value="">Select a reason...</option>
-                    {reasonsData.verificationRejection.map((reason: string, index: number) => (
-                      <option key={index} value={reason}>
-                        {reason}
-                      </option>
-                    ))}
-                    <option value="custom">Other (specify custom reason)</option>
-                  </select>
-                </div>
-
-                {showCustomReason && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Custom Rejection Reason
-                    </label>
-                    <textarea
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
-                      rows={3}
-                      placeholder="Enter custom rejection reason..."
-                      value={customReason}
-                      onChange={(e) => setCustomReason(e.target.value)}
+                    <SmartImage
+                      src={selectedUser.valid_id}
+                      alt="Valid ID"
+                      width={600}
+                      height={400}
+                      className="w-full rounded-lg border border-gray-200"
+                      fallbackType="document"
                     />
                   </div>
                 )}
-
-                <div className="flex justify-end space-x-3 pt-4">
-                  <button
-                    onClick={() => setShowRejectModal(false)}
-                    className="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={confirmRejectUser}
-                    className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500"
-                  >
-                    Reject User
-                  </button>
-                </div>
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* User Deactivation Modal */}
-      {showDeactivateModal && actionUser && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="relative mx-auto border w-11/12 md:w-1/2 lg:w-1/3 shadow-lg rounded-md bg-white max-h-[90vh] overflow-y-auto">
-            <div className="p-5">
-              <div className="mt-3">
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-lg font-medium text-gray-900">Deactivate User</h3>
-                  <button
-                    onClick={() => setShowDeactivateModal(false)}
-                    className="text-gray-400 hover:text-gray-600"
-                  >
-                    ✕
-                  </button>
-                </div>
-                
-                <div className="space-y-4">
-                  <p className="text-sm text-gray-600">
-                    You are deactivating: <strong>{actionUser.first_name} {actionUser.last_name}</strong>
-                  </p>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Deactivation Reason
-                    </label>
-                    <select
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
-                      value={showCustomReason ? "custom" : deactivationReason}
-                      onChange={(e) => {
-                        if (e.target.value === "custom") {
-                          setShowCustomReason(true);
-                          setDeactivationReason("");
-                        } else {
-                          setShowCustomReason(false);
-                          setDeactivationReason(e.target.value);
-                        }
-                      }}
-                    >
-                      <option value="">Select a reason...</option>
-                      {reasonsData.deactivationReasons.map((reason: string, index: number) => (
-                        <option key={index} value={reason}>
-                          {reason}
-                        </option>
-                      ))}
-                      <option value="custom">Other (specify custom reason)</option>
-                    </select>
-                  </div>
+      {/* Review User Verification Modal */}
+      {showReviewModal && actionUser && (
+        <ReviewUserModal
+          isOpen={showReviewModal}
+          user={actionUser}
+          onApprove={() => handleVerifyUser(actionUser.user_id)}
+          onReject={() => {
+            setShowReviewModal(false);
+            handleRejectUser(actionUser);
+          }}
+          onClose={() => {
+            setShowReviewModal(false);
+            setActionUser(null);
+          }}
+        />
+      )}
 
-                  {showCustomReason && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Custom Deactivation Reason
-                      </label>
-                      <textarea
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
-                        rows={3}
-                        placeholder="Enter custom deactivation reason..."
-                        value={customReason}
-                        onChange={(e) => setCustomReason(e.target.value)}
-                      />
-                    </div>
-                  )}
+      {/* Verify Account Modal (Alternative Quick Verify) */}
+      {showVerifyModal && actionUser && (
+        <VerifyAccountModal
+          isOpen={showVerifyModal}
+          accountType="user"
+          accountName={`${actionUser.first_name} ${actionUser.last_name}`}
+          onConfirm={handleVerificationDecision}
+          onClose={() => {
+            setShowVerifyModal(false);
+            setActionUser(null);
+          }}
+        />
+      )}
 
-                  <div className="flex justify-end space-x-3 pt-4">
-                    <button
-                      onClick={() => setShowDeactivateModal(false)}
-                      className="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={confirmDeactivateUser}
-                      className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500"
-                    >
-                      Deactivate User
-                    </button>
-                  </div>
-                </div>
+      {/* Reject Modal */}
+      {showRejectModal && actionUser && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Reject Verification</h3>
+            <p className="text-gray-600 mb-4">
+              Rejecting verification for{" "}
+              <span className="font-semibold">{actionUser.first_name} {actionUser.last_name}</span>
+            </p>
+            
+            {!showCustomReason ? (
+              <div className="space-y-4">
+                <select
+                  value={rejectionReason}
+                  onChange={(e) => {
+                    if (e.target.value === "custom") {
+                      setShowCustomReason(true);
+                    } else {
+                      setRejectionReason(e.target.value);
+                    }
+                  }}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="">Select a reason</option>
+                  {reasonsData.verificationRejection.map((reason) => (
+                    <option key={reason} value={reason}>{reason}</option>
+                  ))}
+                  <option value="custom">Other (Custom reason)</option>
+                </select>
               </div>
+            ) : (
+              <div className="space-y-4">
+                <textarea
+                  value={customReason}
+                  onChange={(e) => setCustomReason(e.target.value)}
+                  placeholder="Enter custom rejection reason..."
+                  rows={4}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+                <button
+                  onClick={() => {
+                    setShowCustomReason(false);
+                    setCustomReason("");
+                  }}
+                  className="text-sm text-blue-600 hover:text-blue-700"
+                >
+                  ← Back to predefined reasons
+                </button>
+              </div>
+            )}
+
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={() => {
+                  setShowRejectModal(false);
+                  setActionUser(null);
+                  setRejectionReason("");
+                  setCustomReason("");
+                  setShowCustomReason(false);
+                }}
+                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmRejectUser}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+              >
+                Reject Verification
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Deactivate Modal */}
+      {showDeactivateModal && actionUser && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Deactivate User Account</h3>
+            <p className="text-gray-600 mb-4">
+              Deactivating account for{" "}
+              <span className="font-semibold">{actionUser.first_name} {actionUser.last_name}</span>
+            </p>
+            
+            {!showCustomReason ? (
+              <div className="space-y-4">
+                <select
+                  value={deactivationReason}
+                  onChange={(e) => {
+                    if (e.target.value === "custom") {
+                      setShowCustomReason(true);
+                    } else {
+                      setDeactivationReason(e.target.value);
+                    }
+                  }}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="">Select a reason</option>
+                  {reasonsData.deactivationReasons.map((reason) => (
+                    <option key={reason} value={reason}>{reason}</option>
+                  ))}
+                  <option value="custom">Other (Custom reason)</option>
+                </select>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <textarea
+                  value={customReason}
+                  onChange={(e) => setCustomReason(e.target.value)}
+                  placeholder="Enter custom deactivation reason..."
+                  rows={4}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+                <button
+                  onClick={() => {
+                    setShowCustomReason(false);
+                    setCustomReason("");
+                  }}
+                  className="text-sm text-blue-600 hover:text-blue-700"
+                >
+                  ← Back to predefined reasons
+                </button>
+              </div>
+            )}
+
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={() => {
+                  setShowDeactivateModal(false);
+                  setActionUser(null);
+                  setDeactivationReason("");
+                  setCustomReason("");
+                  setShowCustomReason(false);
+                }}
+                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDeactivateUser}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+              >
+                Deactivate Account
+              </button>
             </div>
           </div>
         </div>
@@ -955,161 +984,78 @@ export default function UsersPage() {
 
       {/* Export Modal */}
       {showExportModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full p-6">
-            <div className="bg-gradient-to-r from-green-600 to-green-700 -m-6 mb-6 px-6 py-4 rounded-t-lg">
-              <h3 className="text-xl font-bold text-white flex items-center">
-                <svg className="w-6 h-6 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V7.414A2 2 0 0015.414 6L12 2.586A2 2 0 0010.586 2H6zm5 6a1 1 0 10-2 0v3.586l-1.293-1.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V8z" clipRule="evenodd" />
-                </svg>
-                Export Users Data
-              </h3>
-            </div>
-
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Export Users Data</h3>
+            
             <div className="space-y-4">
-              {/* Format Selection */}
               <div>
-                <label className="block text-sm font-medium text-gray-900 mb-2">
-                  Export Format *
-                </label>
-                <div className="grid grid-cols-2 gap-3">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Export Format</label>
+                <div className="flex gap-3">
                   <button
                     onClick={() => setExportFormat('csv')}
-                    className={`px-4 py-3 border-2 rounded-lg font-medium transition-all ${
+                    className={`flex-1 px-4 py-2 border rounded-lg ${
                       exportFormat === 'csv'
-                        ? 'border-green-600 bg-green-50 text-green-700'
-                        : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'
+                        ? 'border-blue-500 bg-blue-50 text-blue-700'
+                        : 'border-gray-300 text-gray-700 hover:bg-gray-50'
                     }`}
                   >
-                    📊 CSV Format
+                    CSV
                   </button>
                   <button
                     onClick={() => setExportFormat('pdf')}
-                    className={`px-4 py-3 border-2 rounded-lg font-medium transition-all ${
+                    className={`flex-1 px-4 py-2 border rounded-lg ${
                       exportFormat === 'pdf'
-                        ? 'border-green-600 bg-green-50 text-green-700'
-                        : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'
+                        ? 'border-blue-500 bg-blue-50 text-blue-700'
+                        : 'border-gray-300 text-gray-700 hover:bg-gray-50'
                     }`}
                   >
-                    📄 PDF Format
+                    PDF
                   </button>
                 </div>
               </div>
 
-              {/* Filters */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-900 mb-2">
-                    Verification Status
-                  </label>
-                  <select
-                    value={exportFilters.verification_status}
-                    onChange={(e) => setExportFilters({...exportFilters, verification_status: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
-                  >
-                    <option value="">All</option>
-                    <option value="pending">Pending</option>
-                    <option value="approved">Approved</option>
-                    <option value="rejected">Rejected</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-900 mb-2">
-                    Active Status
-                  </label>
-                  <select
-                    value={exportFilters.is_activated}
-                    onChange={(e) => setExportFilters({...exportFilters, is_activated: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
-                  >
-                    <option value="">All</option>
-                    <option value="true">Active</option>
-                    <option value="false">Inactive</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-900 mb-2">
-                    Verified Status
-                  </label>
-                  <select
-                    value={exportFilters.is_verified}
-                    onChange={(e) => setExportFilters({...exportFilters, is_verified: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
-                  >
-                    <option value="">All</option>
-                    <option value="true">Verified</option>
-                    <option value="false">Unverified</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Date Range */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-900 mb-2">
-                    From Date
-                  </label>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Date Range (Optional)</label>
+                <div className="grid grid-cols-2 gap-3">
                   <input
                     type="date"
                     value={exportFilters.start_date}
-                    onChange={(e) => setExportFilters({...exportFilters, start_date: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                    onChange={(e) => setExportFilters({ ...exportFilters, start_date: e.target.value })}
+                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                    placeholder="Start Date"
                   />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-900 mb-2">
-                    To Date
-                  </label>
                   <input
                     type="date"
                     value={exportFilters.end_date}
-                    onChange={(e) => setExportFilters({...exportFilters, end_date: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                    onChange={(e) => setExportFilters({ ...exportFilters, end_date: e.target.value })}
+                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                    placeholder="End Date"
                   />
                 </div>
               </div>
             </div>
 
-            <div className="mt-6 flex justify-end space-x-3">
+            <div className="flex justify-end gap-3 mt-6">
               <button
-                onClick={() => {
-                  setShowExportModal(false);
-                  setExportFilters({
-                    verification_status: '',
-                    is_activated: '',
-                    is_verified: '',
-                    start_date: '',
-                    end_date: '',
-                  });
-                }}
+                onClick={() => setShowExportModal(false)}
+                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
                 disabled={exporting}
-                className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition-colors disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
                 onClick={handleExport}
                 disabled={exporting}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
                 {exporting ? (
                   <>
-                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
                     Exporting...
                   </>
                 ) : (
-                  <>
-                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                    Export to {exportFormat.toUpperCase()}
-                  </>
+                  'Export'
                 )}
               </button>
             </div>

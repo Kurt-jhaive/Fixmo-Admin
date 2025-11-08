@@ -95,34 +95,6 @@ export default function PenaltyDashboardRedesign({
         </div>
       </div>
 
-      {/* Secondary Stats - Restricted Accounts */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="bg-white p-6 rounded-xl shadow-md hover:shadow-lg transition-all duration-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wide">Restricted Users</h3>
-              <div className="text-3xl font-bold text-orange-600 mt-2">{dashboardStats.restrictedUsers}</div>
-              <p className="text-sm text-gray-500 mt-1">Penalty points &lt; 60</p>
-            </div>
-            <div className="bg-amber-50 rounded-lg p-4">
-              <span className="text-2xl">⚠️</span>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white p-6 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 border border-gray-100">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-gray-700 font-semibold text-lg mb-1">Restricted Providers</h3>
-              <div className="text-3xl font-bold text-amber-600 mt-2">{dashboardStats.restrictedProviders}</div>
-              <p className="text-sm text-gray-500 mt-1">Penalty points &lt; 60</p>
-            </div>
-            <div className="bg-amber-50 rounded-lg p-4">
-              <span className="text-2xl">🔧</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* Main Content Grid - Chart and Activity */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Common Violations with Chart - Takes 2 columns */}

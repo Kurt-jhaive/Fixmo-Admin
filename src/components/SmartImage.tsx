@@ -65,11 +65,10 @@ export function SmartImage({
     <img
       src={finalImageUrl}
       alt={alt}
-      width={width}
-      height={height}
       className={className}
       onClick={onClick}
       onError={(e) => handleImageError(e, fallbackType)}
+      style={{ maxWidth: '100%', height: 'auto' }}
     />
   );
 }

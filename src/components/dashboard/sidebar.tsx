@@ -10,49 +10,46 @@ const menuItems = [
     href: "/dashboard",
     label: "Dashboard",
     icon: "📊",
-    roles: ["admin", "super_admin"], // Both roles can access
+    roles: ["operations", "verification", "super_admin"],
   },
   {
     href: "/dashboard/users",
     label: "User Management",
     icon: "👥",
-    roles: ["admin", "super_admin"], // Both roles can access
+    roles: ["verification", "super_admin"], // Verification can manage, Operations can only view
+    viewOnly: ["operations"], // Operations has view-only access
   },
   {
     href: "/dashboard/service-providers",
     label: "Service Providers",
     icon: "🔧",
-    roles: ["admin", "super_admin"], // Both roles can access
+    roles: ["verification", "super_admin"], // Verification can manage, Operations can only view
+    viewOnly: ["operations"], // Operations has view-only access
   },
   {
     href: "/dashboard/penalties",
     label: "Penalty Management",
     icon: "⚠️",
-    roles: ["admin", "super_admin"], // Both roles can access
+    roles: ["operations", "super_admin"], // Only Operations and Super Admin
   },
   {
     href: "/dashboard/certificates",
     label: "Certificates",
     icon: "📜",
-    roles: ["admin", "super_admin"], // Both roles can access
+    roles: ["verification", "super_admin"], // Verification can manage, Operations can only view
+    viewOnly: ["operations"], // Operations has view-only access
   },
   {
     href: "/dashboard/appointments",
     label: "Appointments",
     icon: "📅",
-    roles: ["admin", "super_admin"], // Both roles can access
+    roles: ["operations", "super_admin"], // Only Operations and Super Admin
   },
   {
     href: "/dashboard/admins",
     label: "Admin Management",
     icon: "👨‍💼",
     roles: ["super_admin"], // Only super_admin can access
-  },
-  {
-    href: "/dashboard/status",
-    label: "System Status",
-    icon: "🟢",
-    roles: ["admin", "super_admin"], // Both roles can access
   },
 ];
 
@@ -69,10 +66,12 @@ export function Sidebar() {
     }
   }, []);
 
-  // Filter menu items based on user role
-  const accessibleMenuItems = menuItems.filter(item => 
-    userRole && item.roles.includes(userRole)
-  );
+  // Filter menu items based on user role (including view-only access)
+  const accessibleMenuItems = menuItems.filter(item => {
+    if (!userRole) return false;
+    // Include if user's role is in the roles array OR in the viewOnly array
+    return item.roles.includes(userRole) || (item.viewOnly && item.viewOnly.includes(userRole));
+  });
 
   return (
     <div className={`bg-gray-900 text-white transition-all duration-300 h-screen sticky top-0 flex flex-col ${isCollapsed ? "w-16" : "w-64"}`}>

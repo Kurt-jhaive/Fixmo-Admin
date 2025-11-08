@@ -8,8 +8,12 @@ import PenaltyDashboardRedesign from '@/components/dashboard/penalty-dashboard-r
 import KebabMenu, { KebabButton } from '@/components/ui/KebabMenu';
 import AdjustPointsModal, { type AdjustmentData } from '@/components/dashboard/AdjustPointsModal';
 import ReviewAppealModal, { type AppealReviewData } from '@/components/dashboard/ReviewAppealModal';
+import { useRBAC } from "@/lib/useRBAC";
+import { ViewOnlyBanner } from "@/components/ViewOnlyBanner";
+import { PermissionGuard } from "@/components/PermissionGuard";
 
 export default function PenaltiesPage() {
+  const { canEdit, canApprove } = useRBAC('penalties');
   const [activeTab, setActiveTab] = useState<'dashboard' | 'violations' | 'appeals' | 'restricted' | 'logs'>('dashboard');
   const [loading, setLoading] = useState(true);
   
@@ -322,6 +326,8 @@ export default function PenaltiesPage() {
 
   return (
     <div className="p-6">
+      <ViewOnlyBanner module="penalties" />
+      
       <div className="mb-6 flex justify-between items-start">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Penalty Management</h1>
@@ -329,7 +335,7 @@ export default function PenaltiesPage() {
         </div>
 
         {/* Adjust Points Button */}
-        <div>
+        <PermissionGuard module="penalties" action="canEdit">
           <button
             onClick={() => setShowAdjustModal(true)}
             className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 font-semibold shadow-md hover:shadow-lg transition-all duration-200 flex items-center gap-2"
@@ -339,7 +345,7 @@ export default function PenaltiesPage() {
             </svg>
             Adjust Points
           </button>
-        </div>
+        </PermissionGuard>
       </div>
 
       {/* Tabs */}
@@ -575,7 +581,7 @@ export default function PenaltiesPage() {
                                     setShowDismissModal(true);
                                   },
                                   variant: 'success',
-                                  hidden: violation.status !== 'active'
+                                  hidden: violation.status !== 'active' || !canEdit
                                 }
                               ]}
                             />
@@ -805,7 +811,12 @@ export default function PenaltiesPage() {
                             setSelectedAppeal(appeal);
                             setShowAppealModal(true);
                           }}
-                          className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold shadow-md hover:shadow-lg transition-all duration-200"
+                          disabled={!canApprove}
+                          className={`flex items-center gap-2 px-6 py-3 rounded-lg font-semibold shadow-md hover:shadow-lg transition-all duration-200 ${
+                            canApprove 
+                              ? 'bg-blue-600 text-white hover:bg-blue-700' 
+                              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                          }`}
                         >
                           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />

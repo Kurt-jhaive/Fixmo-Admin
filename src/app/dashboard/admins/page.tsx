@@ -4,9 +4,26 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { adminApi, Admin, authApi } from "@/lib/api";
 
-const rolePermissions = {
-  "super_admin": ["user_management", "provider_approval", "certificate_review", "admin_management", "system_settings"],
-  "admin": ["user_management", "provider_approval", "certificate_review"],
+// Role definitions with descriptions
+const roleDefinitions = {
+  "operations": {
+    label: "Operations",
+    color: "bg-blue-100 text-blue-800 border-blue-300",
+    description: "Can manage penalties, disputes, and appointments",
+    permissions: ["penalty_management", "dispute_resolution", "appointment_management"]
+  },
+  "verification_team": {
+    label: "Verification Team",
+    color: "bg-green-100 text-green-800 border-green-300",
+    description: "Can approve users, service providers, and review certificates",
+    permissions: ["user_verification", "provider_verification", "certificate_review"]
+  },
+  "super_admin": {
+    label: "Super Administrator",
+    color: "bg-amber-100 text-amber-800 border-amber-300",
+    description: "Full system access - Database only",
+    permissions: ["all_permissions"]
+  }
 };
 
 const getStatusBadge = (status: boolean) => {
@@ -55,9 +72,10 @@ export default function AdminsPage() {
   const [actionLoading, setActionLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [newAdmin, setNewAdmin] = useState({
-    name: "",
+    firstName: "",
+    lastName: "",
     email: "",
-    role: "admin" as "admin" | "super_admin",
+    role: "operations" as "operations" | "verification_team",
   });
 
   const normalizeAdmin = useCallback((adminData: Record<string, unknown>): Admin => {
@@ -66,7 +84,7 @@ export default function AdminsPage() {
       username: (adminData.admin_username as string) || (adminData.username as string) || '',
       email: (adminData.admin_email as string) || (adminData.email as string) || '',
       name: (adminData.admin_name as string) || (adminData.name as string) || '',
-      role: (adminData.admin_role as 'admin' | 'super_admin') || (adminData.role as 'admin' | 'super_admin') || 'admin',
+      role: (adminData.admin_role as 'operations' | 'verification' | 'super_admin') || (adminData.role as 'operations' | 'verification' | 'super_admin') || 'operations',
       is_active: adminData.is_active !== undefined ? (adminData.is_active as boolean) : true,
       must_change_password: (adminData.must_change_password as boolean) || false,
       created_at: (adminData.created_at as string) || new Date().toISOString(),
@@ -126,19 +144,48 @@ export default function AdminsPage() {
   }, [fetchAdmins]);
 
   const handleAddAdmin = async () => {
-    if (!newAdmin.name.trim() || !newAdmin.email.trim()) {
+    if (!newAdmin.firstName.trim() || !newAdmin.lastName.trim() || !newAdmin.email.trim()) {
       setError('Please fill in all required fields');
+      return;
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(newAdmin.email.trim())) {
+      setError('Please enter a valid email address');
+      return;
+    }
+
+    // Check if email already exists
+    const emailExists = admins.some(
+      admin => admin.email.toLowerCase() === newAdmin.email.trim().toLowerCase()
+    );
+    
+    if (emailExists) {
+      setError('An administrator with this email address already exists');
       return;
     }
 
     try {
       setActionLoading(true);
       setError(null);
-      const response = await adminApi.inviteAdmin(newAdmin);
+      
+      // Combine first and last name
+      const fullName = `${newAdmin.firstName.trim()} ${newAdmin.lastName.trim()}`;
+      
+      // Map frontend roles to backend database roles
+      const backendRole = newAdmin.role === 'operations' ? 'operations' : 'verification';
+      
+      const response = await adminApi.inviteAdmin({
+        name: fullName,
+        email: newAdmin.email,
+        role: backendRole
+      });
+      
       await fetchAdmins(); // Refresh the list
       setShowAddAdminModal(false);
-      setNewAdmin({ name: "", email: "", role: "admin" });
-      setSuccess(`Admin ${newAdmin.name} invited successfully! Temporary password: ${response.temporary_password || 'Sent via email'}`);
+      setNewAdmin({ firstName: "", lastName: "", email: "", role: "operations" });
+      setSuccess(`Admin ${fullName} invited successfully! Temporary password: ${response.temporary_password || 'Sent via email'}`);
       
       // Clear success message after 5 seconds
       setTimeout(() => setSuccess(null), 5000);
@@ -167,7 +214,16 @@ export default function AdminsPage() {
   };
 
   const formatRole = (role: string) => {
-    return role === 'super_admin' ? 'Super Admin' : 'Admin';
+    // Map database roles to frontend role definitions
+    if (role === 'operations') return roleDefinitions.operations;
+    if (role === 'verification' || role === 'verification_team') return roleDefinitions.verification_team;
+    if (role === 'super_admin') return roleDefinitions.super_admin;
+    return roleDefinitions.operations; // default
+  };
+
+  const getRoleBadgeClass = (role: string) => {
+    const roleInfo = formatRole(role);
+    return `px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full border ${roleInfo.color}`;
   };
 
   const handleResetPassword = (admin: Admin) => {
@@ -387,10 +443,7 @@ export default function AdminsPage() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Last Login
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Permissions
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Actions
                   </th>
                 </tr>
@@ -415,8 +468,10 @@ export default function AdminsPage() {
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {formatRole(admin.role || 'admin')}
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={getRoleBadgeClass(admin.role || 'operations')}>
+                          {formatRole(admin.role || 'operations').label}
+                        </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={getStatusBadge(admin.is_active !== undefined ? admin.is_active : false)}>
@@ -426,25 +481,17 @@ export default function AdminsPage() {
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         {formatLastLogin(admin.last_login)}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex flex-wrap gap-1">
-                          {admin.role && rolePermissions[admin.role]?.slice(0, 2).map(permission => (
-                            <span key={permission} className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                              {permission.replace("_", " ")}
-                            </span>
-                          ))}
-                          {admin.role && rolePermissions[admin.role]?.length > 2 && (
-                            <span className="text-xs text-gray-500">+{rolePermissions[admin.role].length - 2} more</span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <div className="flex space-x-2">
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <div className="flex justify-end space-x-2">
                           <button 
                             onClick={() => handleResetPassword(admin)}
                             className="inline-flex items-center px-3 py-1.5 text-xs font-bold text-white bg-blue-600 border-2 border-blue-600 hover:bg-blue-700 hover:border-blue-700 rounded-md transition-colors duration-200 shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                             style={{ color: '#ffffff !important', backgroundColor: '#2563eb !important' }}
+                            title="Reset Password"
                           >
+                            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                            </svg>
                             Reset Password
                           </button>
                           {admin.is_active ? (
@@ -452,7 +499,11 @@ export default function AdminsPage() {
                               onClick={() => handleToggleStatus(admin)}
                               className="inline-flex items-center px-3 py-1.5 text-xs font-bold text-white bg-red-600 border-2 border-red-600 hover:bg-red-700 hover:border-red-700 rounded-md transition-colors duration-200 shadow-md focus:outline-none focus:ring-2 focus:ring-red-500"
                               style={{ color: '#ffffff !important', backgroundColor: '#dc2626 !important' }}
+                              title="Deactivate Admin"
                             >
+                              <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                              </svg>
                               Deactivate
                             </button>
                           ) : (
@@ -460,7 +511,11 @@ export default function AdminsPage() {
                               onClick={() => handleToggleStatus(admin)}
                               className="inline-flex items-center px-3 py-1.5 text-xs font-bold text-white bg-green-600 border-2 border-green-600 hover:bg-green-700 hover:border-green-700 rounded-md transition-colors duration-200 shadow-md focus:outline-none focus:ring-2 focus:ring-green-500"
                               style={{ color: '#ffffff !important', backgroundColor: '#16a34a !important' }}
+                              title="Activate Admin"
                             >
+                              <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
                               Activate
                             </button>
                           )}
@@ -470,7 +525,7 @@ export default function AdminsPage() {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={6} className="px-6 py-8 text-center">
+                    <td colSpan={5} className="px-6 py-8 text-center">
                       <div className="text-gray-500">
                         {loading ? 'Loading admins...' : 'No administrators found'}
                       </div>
@@ -500,17 +555,27 @@ export default function AdminsPage() {
             {/* Modal Body */}
             <div className="p-6 space-y-6">
               <div>
-                <label className="block text-sm font-medium text-gray-900 mb-2">Full Name</label>
+                <label className="block text-sm font-medium text-gray-900 mb-2">First Name *</label>
                 <input
                   type="text"
-                  value={newAdmin.name}
-                  onChange={(e) => setNewAdmin({...newAdmin, name: e.target.value})}
+                  value={newAdmin.firstName}
+                  onChange={(e) => setNewAdmin({...newAdmin, firstName: e.target.value})}
                   className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white"
-                  placeholder="Enter full name"
+                  placeholder="Enter first name"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-900 mb-2">Email Address</label>
+                <label className="block text-sm font-medium text-gray-900 mb-2">Last Name *</label>
+                <input
+                  type="text"
+                  value={newAdmin.lastName}
+                  onChange={(e) => setNewAdmin({...newAdmin, lastName: e.target.value})}
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white"
+                  placeholder="Enter last name"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-900 mb-2">Email Address *</label>
                 <input
                   type="email"
                   value={newAdmin.email}
@@ -520,25 +585,34 @@ export default function AdminsPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-900 mb-2">Role</label>
+                <label className="block text-sm font-medium text-gray-900 mb-2">Role *</label>
                 <select
                   value={newAdmin.role}
-                  onChange={(e) => setNewAdmin({...newAdmin, role: e.target.value as "admin" | "super_admin"})}
+                  onChange={(e) => setNewAdmin({...newAdmin, role: e.target.value as "operations" | "verification_team"})}
                   className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white"
                 >
-                  <option value="admin">Admin</option>
+                  <option value="operations">{roleDefinitions.operations.label}</option>
+                  <option value="verification_team">{roleDefinitions.verification_team.label}</option>
                 </select>
               </div>
+              
+              {/* Role Description */}
               <div className="bg-blue-50 border border-blue-200 p-4 rounded-md">
-                <div className="text-sm font-medium text-blue-900 mb-3">Permissions for {formatRole(newAdmin.role)}:</div>
+                <div className="text-sm font-medium text-blue-900 mb-2">
+                  {formatRole(newAdmin.role).label}
+                </div>
+                <div className="text-sm text-blue-800 mb-3">
+                  {formatRole(newAdmin.role).description}
+                </div>
                 <div className="flex flex-wrap gap-2">
-                  {rolePermissions[newAdmin.role]?.map(permission => (
+                  {formatRole(newAdmin.role).permissions.map((permission: string) => (
                     <span key={permission} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                      {permission.replace("_", " ")}
+                      {permission.replace(/_/g, " ")}
                     </span>
                   ))}
                 </div>
               </div>
+
               <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-md">
                 <div className="flex items-start">
                   <svg className="w-5 h-5 text-yellow-600 mr-2 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
@@ -562,7 +636,7 @@ export default function AdminsPage() {
               </button>
               <button
                 onClick={handleAddAdmin}
-                disabled={actionLoading || !newAdmin.name.trim() || !newAdmin.email.trim()}
+                disabled={actionLoading || !newAdmin.firstName.trim() || !newAdmin.lastName.trim() || !newAdmin.email.trim()}
                 className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border-2 border-blue-600 rounded-md hover:bg-blue-700 hover:border-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center transition-all duration-200 shadow-md"
                 style={{ color: '#ffffff !important', backgroundColor: '#2563eb !important' }}
               >
