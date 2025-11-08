@@ -60,14 +60,15 @@ export function SmartImage({
   }
 
   return (
+    // Using regular img tag for external URLs (e.g., Cloudinary) to avoid Next.js Image optimization issues
+    // eslint-disable-next-line @next/next/no-img-element
     <img
       src={finalImageUrl}
       alt={alt}
-      width={width}
-      height={height}
       className={className}
       onClick={onClick}
       onError={(e) => handleImageError(e, fallbackType)}
+      style={{ maxWidth: '100%', height: 'auto' }}
     />
   );
 }

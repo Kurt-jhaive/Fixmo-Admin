@@ -2,6 +2,9 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { appointmentsApi, exportApi, getAdminName, authApi, type BackjobApplication } from '@/lib/api';
+import KebabMenu, { KebabButton } from '@/components/ui/KebabMenu';
+import { useRBAC } from "@/lib/useRBAC";
+import { ViewOnlyBanner } from "@/components/ViewOnlyBanner";
 
   interface Appointment {
     appointment_id: number;
@@ -97,6 +100,7 @@ import { appointmentsApi, exportApi, getAdminName, authApi, type BackjobApplicat
   }
 
   export default function AppointmentsPage() {
+  const { canDelete, canApprove } = useRBAC('appointments');
     const [appointments, setAppointments] = useState<Appointment[]>([]);
     const [backjobs, setBackjobs] = useState<BackjobApplication[]>([]);
     const [isSuperAdmin, setIsSuperAdmin] = useState(false);
@@ -132,6 +136,9 @@ import { appointmentsApi, exportApi, getAdminName, authApi, type BackjobApplicat
       end_date: ''
     });
     const [exporting, setExporting] = useState(false);
+
+    // Kebab menu state
+    const [openMenuId, setOpenMenuId] = useState<number | null>(null);
 
     useEffect(() => {
       const user = authApi.getStoredUser();
@@ -415,6 +422,8 @@ import { appointmentsApi, exportApi, getAdminName, authApi, type BackjobApplicat
 
     return (
       <div className="p-6">
+        <ViewOnlyBanner module="appointments" />
+        
         <div className="mb-6">
           <h1 className="text-3xl font-bold text-gray-900">Appointment Management</h1>
           <p className="text-gray-600 mt-2">Manage appointments and resolve disputes</p>
@@ -538,10 +547,7 @@ import { appointmentsApi, exportApi, getAdminName, authApi, type BackjobApplicat
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Price
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Cancelled By
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Actions
                         </th>
                       </tr>
@@ -585,30 +591,43 @@ import { appointmentsApi, exportApi, getAdminName, authApi, type BackjobApplicat
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                             ₱{appointment.final_price?.toFixed(2) || appointment.service.service_startingprice.toFixed(2)}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            {appointment.cancelled_by_admin_id ? (
-                              <div className="text-sm font-medium text-gray-900">
-                                <AdminName adminId={appointment.cancelled_by_admin_id} />
-                              </div>
-                            ) : (
-                              <span className="text-sm text-gray-400">—</span>
-                            )}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
-                            <button
-                              onClick={() => setSelectedAppointment(appointment)}
-                              className="text-blue-600 hover:text-blue-900"
-                            >
-                              View
-                            </button>
-                            {!['completed', 'cancelled', 'backjob'].includes(appointment.appointment_status) && (
-                              <button
-                                onClick={() => openCancelModal(appointment.appointment_id, appointment.appointment_status)}
-                                className="text-red-600 hover:text-red-900"
-                              >
-                                Cancel
-                              </button>
-                            )}
+                          <td className="px-6 py-4 whitespace-nowrap text-right relative">
+                            <KebabButton 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setOpenMenuId(openMenuId === appointment.appointment_id ? null : appointment.appointment_id);
+                              }}
+                              isOpen={openMenuId === appointment.appointment_id}
+                            />
+                            <KebabMenu
+                              isOpen={openMenuId === appointment.appointment_id}
+                              onClose={() => setOpenMenuId(null)}
+                              position="right"
+                              items={[
+                                {
+                                  label: 'View Details',
+                                  icon: (
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                    </svg>
+                                  ),
+                                  onClick: () => setSelectedAppointment(appointment),
+                                  variant: 'primary'
+                                },
+                                {
+                                  label: 'Cancel Appointment',
+                                  icon: (
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                  ),
+                                  onClick: () => openCancelModal(appointment.appointment_id, appointment.appointment_status),
+                                  variant: 'danger',
+                                  hidden: ['completed', 'cancelled', 'backjob'].includes(appointment.appointment_status) || !canDelete
+                                }
+                              ]}
+                            />
                           </td>
                         </tr>
                       ))}
@@ -691,12 +710,63 @@ import { appointmentsApi, exportApi, getAdminName, authApi, type BackjobApplicat
                           Disputed
                         </span>
                       </div>
-                      <div className="text-sm text-gray-500">
-                        Created: {new Date(backjob.created_at).toLocaleString()}
+                      <div className="flex items-center gap-4">
+                        <div className="text-sm text-gray-500">
+                          Created: {new Date(backjob.created_at).toLocaleString()}
+                        </div>
+                        <div className="relative">
+                          <KebabButton 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setOpenMenuId(openMenuId === backjob.backjob_id ? null : backjob.backjob_id);
+                            }}
+                            isOpen={openMenuId === backjob.backjob_id}
+                          />
+                          <KebabMenu
+                            isOpen={openMenuId === backjob.backjob_id}
+                            onClose={() => setOpenMenuId(null)}
+                            position="right"
+                            items={[
+                              {
+                                label: 'View Dispute Details',
+                                icon: (
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                  </svg>
+                                ),
+                                onClick: () => {
+                                  // Scroll to the dispute details (already visible in card)
+                                  const element = document.getElementById(`backjob-${backjob.backjob_id}`);
+                                  element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                },
+                                variant: 'primary'
+                              },
+                              {
+                                label: 'Resolve Dispute',
+                                icon: (
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                  </svg>
+                                ),
+                                onClick: () => {
+                                  // Show options to approve or reject
+                                  const action = window.confirm('Click OK to APPROVE dispute (side with provider)\nClick CANCEL to REJECT dispute (side with customer)');
+                                  if (action) {
+                                    openApproveDisputeModal(backjob.backjob_id);
+                                  } else {
+                                    openRejectDisputeModal(backjob.backjob_id);
+                                  }
+                                },
+                                variant: 'success',
+                                hidden: !canApprove
+                              }
+                            ]}
+                          />
+                        </div>
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                    <div id={`backjob-${backjob.backjob_id}`} className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                       {/* Customer Information */}
                       <div className="border-l-4 border-blue-500 pl-4">
                         <h4 className="font-semibold text-gray-900 mb-2">Customer Claim</h4>
@@ -794,7 +864,7 @@ import { appointmentsApi, exportApi, getAdminName, authApi, type BackjobApplicat
                     </div>
 
                     {/* Appointment Details */}
-                    <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                    <div className="bg-gray-50 rounded-lg p-4">
                       <h4 className="font-semibold text-gray-900 mb-2">Appointment Details</h4>
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                         <div>
@@ -818,24 +888,6 @@ import { appointmentsApi, exportApi, getAdminName, authApi, type BackjobApplicat
                           <p className="font-medium">{backjob.appointment.warranty_days || 0} days</p>
                         </div>
                       </div>
-                    </div>
-
-                    {/* Admin Actions */}
-                    <div className="flex flex-wrap justify-end gap-3">
-                      <button
-                        onClick={() => openRejectDisputeModal(backjob.backjob_id)}
-                        className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 transition-all duration-200"
-                        title="Reject provider's dispute - backjob remains active, provider must reschedule"
-                      >
-                        ⚠️ Reject Dispute (Side with Customer)
-                      </button>
-                      <button
-                        onClick={() => openApproveDisputeModal(backjob.backjob_id)}
-                        className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-all duration-200"
-                        title="Approve provider's dispute - backjob will be automatically approved and warranty resumed"
-                      >
-                        ✅ Approve Dispute (Side with Provider)
-                      </button>
                     </div>
                   </div>
                 ))}

@@ -1,4 +1,4 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://fixmo-backend-production.up.railway.app';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://192.168.1.2:3000';
 import { isTokenExpired } from './auth-utils';
 
 console.log('API_BASE_URL:', API_BASE_URL); // Debug log
@@ -389,17 +389,26 @@ export const adminApi = {
   },
 
   // Certificate Management
-  async getCertificates(filters: { page?: number; limit?: number; status?: string; provider_id?: number; search?: string } = {}) {
+  async getCertificates(filters: { page?: number; limit?: number; status?: string; certificate_status?: string; provider_id?: number; search?: string } = {}) {
     const params = new URLSearchParams();
     Object.entries(filters).forEach(([key, value]) => {
       if (value !== undefined && value !== '') params.append(key, String(value));
     });
     
+    console.log('📤 API: Sending GET request to /api/admin/certificates with params:', params.toString());
+    
     const response = await fetch(`${API_BASE_URL}/api/admin/certificates?${params}`, {
       headers: getAuthHeaders(),
     });
     if (!response.ok) throw new Error('Failed to fetch certificates');
-    return response.json();
+    const data = await response.json();
+    
+    console.log('📥 API: Received response from backend:', {
+      count: (data.certificates || data || []).length,
+      hasFilters: params.toString() !== ''
+    });
+    
+    return data;
   },
 
   async getCertificateById(certificateId: number) {
@@ -555,7 +564,7 @@ export const adminApi = {
     return data;
   },
 
-  async inviteAdmin(adminData: { email: string; name: string; role: 'admin' | 'super_admin' }) {
+  async inviteAdmin(adminData: { email: string; name: string; role: 'operations' | 'verification' | 'super_admin' }) {
     const response = await fetch(`${API_BASE_URL}/api/admin/`, {
       method: 'POST',
       headers: getAuthHeaders(),
@@ -596,6 +605,11 @@ export const adminApi = {
 };
 
 // Types for better TypeScript support
+export interface AdminInfo {
+  name: string;
+  email: string;
+}
+
 export interface User {
   user_id: number;
   first_name: string;
@@ -613,7 +627,9 @@ export interface User {
   birthday?: string;
   exact_location?: string;
   verified_by_admin_id?: number;
+  verified_by_admin?: AdminInfo | null;
   deactivated_by_admin_id?: number;
+  deactivated_by_admin?: AdminInfo | null;
   verification_reviewed_at?: string;
 }
 
@@ -636,7 +652,9 @@ export interface ServiceProvider {
   provider_birthday?: string;
   provider_exact_location?: string;
   verified_by_admin_id?: number;
+  verified_by_admin?: AdminInfo | null;
   deactivated_by_admin_id?: number;
+  deactivated_by_admin?: AdminInfo | null;
   verification_reviewed_at?: string;
 }
 
@@ -658,7 +676,7 @@ export interface Admin {
   username: string;
   email: string;
   name: string;
-  role: 'admin' | 'super_admin';
+  role: 'operations' | 'verification' | 'super_admin';
   is_active: boolean;
   must_change_password: boolean;
   created_at: string;
@@ -1049,6 +1067,362 @@ export const exportApi = {
   },
 };
 
+// Penalty Management Types
+export interface PenaltyViolation {
+  violation_id: number;
+  user_id?: number;
+  provider_id?: number;
+  violation_code?: string;
+  violation_name?: string;
+  penalty_points_deducted?: number;
+  points_deducted?: number; // Alternative field name
+  status: 'active' | 'appealed' | 'reversed' | 'expired';
+  appeal_reason?: string;
+  appeal_status?: 'pending' | 'approved' | 'rejected';
+  evidence_urls?: string | string[]; // Primary field from backend
+  appeal_evidence?: string | string[]; // Alternative field name
+  evidence?: string | string[]; // Alternative field name
+  created_at: string;
+  user?: {
+    user_id: number;
+    first_name: string;
+    last_name: string;
+    email: string;
+  };
+  provider?: {
+    provider_id: number;
+    provider_first_name: string;
+    provider_last_name: string;
+    provider_email: string;
+  };
+  violation_type?: {
+    violation_code: string;
+    violation_name: string;
+    penalty_points: number;
+  };
+}
+
+export interface PenaltyAdjustmentLog {
+  adjustment_id: number;
+  user_id?: number;
+  provider_id?: number;
+  adjustment_type: 'penalty' | 'reward' | 'restore' | 'reset' | 'suspension' | 'lift_suspension';
+  points_adjusted: number;
+  previous_points: number;
+  new_points: number;
+  reason: string;
+  adjusted_by_admin?: {
+    admin_id: number;
+    name?: string;
+    admin_name?: string;  // Backend might use this field
+    email?: string;
+    admin_email?: string; // Backend might use this field
+  } | null;
+  adjusted_by_admin_id?: number; // In case backend only returns ID
+  created_at: string;
+}
+
+export interface RestrictedAccount {
+  user_id?: number;
+  provider_id?: number;
+  first_name: string;
+  last_name: string;
+  email: string;
+  penalty_points: number;
+  is_suspended: boolean;
+  suspension_reason?: string;
+  suspension_ends_at?: string;
+}
+
+export interface PenaltyDashboardStats {
+  totalViolations: number;
+  weeklyViolations: number;
+  suspendedUsers: number;
+  suspendedProviders: number;
+  restrictedUsers: number;
+  restrictedProviders: number;
+  pendingAppeals: number;
+  commonViolations: Array<{
+    violation_code: string;
+    violation_name: string;
+    penalty_points: number;
+    count: number;
+  }>;
+}
+
+export interface PenaltyPaginationData {
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export interface PenaltyPointsAdjustmentData {
+  adjustmentId: number;
+  points: number;
+  userId?: number;
+  providerId?: number;
+}
+
+// Penalty Management API
+export const penaltyApi = {
+  // Get all violations with filters
+  async getViolations(filters: {
+    userId?: number;
+    providerId?: number;
+    status?: string;
+    limit?: number;
+    offset?: number;
+  } = {}): Promise<{ success: boolean; data: { violations: PenaltyViolation[] } }> {
+    const queryParams = new URLSearchParams();
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        queryParams.append(key, String(value));
+      }
+    });
+
+    const response = await makeAuthenticatedRequest(
+      `${API_BASE_URL}/api/penalty/admin/violations?${queryParams.toString()}`
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to fetch violations');
+    }
+
+    return response.json();
+  },
+
+  // Adjust points (add or deduct)
+  async adjustPoints(data: {
+    userId?: number;
+    providerId?: number;
+    points: number;
+    adjustmentType: 'add' | 'deduct';
+    reason: string;
+  }): Promise<{ success: boolean; message: string; data: PenaltyPointsAdjustmentData }> {
+    const response = await makeAuthenticatedRequest(
+      `${API_BASE_URL}/api/penalty/admin/adjust-points`,
+      {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to adjust points');
+    }
+
+    return response.json();
+  },
+
+  // Manage suspension
+  async manageSuspension(data: {
+    userId?: number;
+    providerId?: number;
+    action: 'suspend' | 'lift';
+    reason: string;
+    suspensionDays?: number;
+  }): Promise<{ success: boolean; message: string }> {
+    const response = await makeAuthenticatedRequest(
+      `${API_BASE_URL}/api/penalty/admin/manage-suspension`,
+      {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to manage suspension');
+    }
+
+    return response.json();
+  },
+
+  // Reset points to default
+  async resetPoints(data: {
+    userId?: number;
+    providerId?: number;
+    reason: string;
+    resetValue?: number;
+  }): Promise<{ success: boolean; message: string; data: PenaltyPointsAdjustmentData }> {
+    const response = await makeAuthenticatedRequest(
+      `${API_BASE_URL}/api/penalty/admin/reset-points`,
+      {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to reset points');
+    }
+
+    return response.json();
+  },
+
+  // Get pending appeals
+  async getPendingAppeals(): Promise<{ success: boolean; data: PenaltyViolation[] }> {
+    const response = await makeAuthenticatedRequest(
+      `${API_BASE_URL}/api/penalty/admin/pending-appeals`
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to fetch pending appeals');
+    }
+
+    return response.json();
+  },
+
+  // Review appeal
+  async reviewAppeal(
+    violationId: number,
+    data: {
+      approved: boolean;
+      reviewNotes: string;
+    }
+  ): Promise<{ success: boolean; message: string }> {
+    const response = await makeAuthenticatedRequest(
+      `${API_BASE_URL}/api/penalty/admin/review-appeal/${violationId}`,
+      {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to review appeal');
+    }
+
+    return response.json();
+  },
+
+  // Dismiss/Reverse a violation
+  async dismissViolation(
+    violationId: number,
+    reason: string
+  ): Promise<{ success: boolean; message: string }> {
+    const response = await makeAuthenticatedRequest(
+      `${API_BASE_URL}/api/penalty/admin/reverse-violation/${violationId}`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ reason }),
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to dismiss violation');
+    }
+
+    return response.json();
+  },
+
+  // Get violation details
+  async getViolationDetails(violationId: number): Promise<{ success: boolean; data: PenaltyViolation }> {
+    const response = await makeAuthenticatedRequest(
+      `${API_BASE_URL}/api/penalty/admin/violations/${violationId}`
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to fetch violation details');
+    }
+
+    return response.json();
+  },
+
+  // Get adjustment logs
+  async getAdjustmentLogs(filters: {
+    userId?: number;
+    providerId?: number;
+    adjustmentType?: string;
+    limit?: number;
+    offset?: number;
+  } = {}): Promise<{ success: boolean; data: { logs: PenaltyAdjustmentLog[]; pagination: PenaltyPaginationData } }> {
+    const queryParams = new URLSearchParams();
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        queryParams.append(key, String(value));
+      }
+    });
+
+    const url = `${API_BASE_URL}/api/penalty/admin/adjustment-logs?${queryParams.toString()}`;
+    console.log('Fetching adjustment logs from:', url);
+    
+    try {
+      const response = await makeAuthenticatedRequest(url);
+      
+      console.log('Adjustment logs response status:', response.status);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Adjustment logs error response:', errorText);
+        
+        try {
+          const error = JSON.parse(errorText);
+          throw new Error(error.message || `Failed to fetch adjustment logs: ${response.status}`);
+        } catch {
+          // If JSON parse fails, throw with the text response
+          throw new Error(`Failed to fetch adjustment logs: ${response.status} - ${errorText.substring(0, 200)}`);
+        }
+      }
+
+      const data = await response.json();
+      console.log('Adjustment logs response data:', data);
+      return data;
+    } catch (err) {
+      const error = err as Error;
+      console.error('Error in getAdjustmentLogs:', error);
+      throw error;
+    }
+  },
+
+  // Get restricted accounts
+  async getRestrictedAccounts(filters: {
+    type?: 'user' | 'provider' | 'both';
+    limit?: number;
+    offset?: number;
+  } = {}): Promise<{ success: boolean; data: { restrictedUsers: RestrictedAccount[]; restrictedProviders: RestrictedAccount[] } }> {
+    const queryParams = new URLSearchParams();
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        queryParams.append(key, String(value));
+      }
+    });
+
+    const response = await makeAuthenticatedRequest(
+      `${API_BASE_URL}/api/penalty/admin/restricted-accounts?${queryParams.toString()}`
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to fetch restricted accounts');
+    }
+
+    return response.json();
+  },
+
+  // Get dashboard statistics
+  async getDashboardStats(): Promise<{ success: boolean; data: PenaltyDashboardStats }> {
+    const response = await makeAuthenticatedRequest(
+      `${API_BASE_URL}/api/penalty/admin/dashboard`
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to fetch dashboard stats');
+    }
+
+    return response.json();
+  },
+};
+
 // Admin cache for tracking
 const adminCache: Map<number, { name: string; email: string }> = new Map();
 
@@ -1058,19 +1432,22 @@ export const getAdminName = async (adminId: number | null | undefined): Promise<
   // Check cache first
   if (adminCache.has(adminId)) {
     const admin = adminCache.get(adminId)!;
-    return `${admin.name} (ID: ${adminId})`;
+    return admin.name; // Return just the name, not including ID
   }
   
   // Fetch from API
   try {
+    console.log('🔍 Fetching admin name for ID:', adminId);
     const admin = await adminApi.getAdminById(adminId);
-    if (admin) {
-      adminCache.set(adminId, { name: admin.name, email: admin.email });
-      return `${admin.name} (ID: ${adminId})`;
+    console.log('✅ Admin data received:', admin);
+    if (admin && admin.name) {
+      adminCache.set(adminId, { name: admin.name, email: admin.email || '' });
+      return admin.name; // Return just the name
     }
   } catch (error) {
-    console.error('Error fetching admin:', error);
+    console.error('❌ Error fetching admin name for ID', adminId, ':', error);
   }
   
-  return `Admin ID: ${adminId}`;
+  // Fallback - return just the ID if name can't be fetched
+  return `Admin ${adminId}`;
 };

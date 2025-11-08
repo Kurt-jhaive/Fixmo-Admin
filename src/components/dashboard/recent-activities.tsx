@@ -26,10 +26,10 @@ export function RecentActivities() {
       color: 'bg-purple-500 hover:bg-purple-600'
     },
     {
-      title: 'System Status',
-      description: 'Monitor system health and activity',
-      href: '/dashboard/status',
-      icon: '📊',
+      title: 'Appointments',
+      description: 'Manage appointments and disputes',
+      href: '/dashboard/appointments',
+      icon: '�',
       color: 'bg-orange-500 hover:bg-orange-600'
     }
   ];
