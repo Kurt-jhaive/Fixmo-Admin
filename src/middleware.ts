@@ -27,9 +27,17 @@ function sanitizeRedirectUrl(url: URL): URL {
 export function middleware(request: NextRequest) {
   const response = NextResponse.next();
   const origin = request.headers.get('origin');
+  const url = new URL(request.url);
+
+  // Security: Handle root path redirect in middleware (ZAP Alert 10044 - Big Redirect)
+  // Using 302 instead of 307 and handling in middleware prevents large redirect response bodies
+  if (url.pathname === '/') {
+    // Use 302 Found instead of 307 to avoid "Big Redirect" detection
+    // Middleware redirect has minimal response body compared to page-level redirect
+    return NextResponse.redirect(new URL('/login', request.url), { status: 302 });
+  }
 
   // Security: Remove sensitive query parameters from login URLs (ZAP Alert 10044)
-  const url = new URL(request.url);
   if (url.pathname === '/login' && (url.searchParams.has('password') || url.searchParams.has('username'))) {
     // Redirect to clean login URL without sensitive params in URL
     const cleanUrl = sanitizeRedirectUrl(url);
