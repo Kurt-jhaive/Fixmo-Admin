@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { adminApi, Admin, authApi } from "@/lib/api";
+import { devLog, devError } from "@/lib/logger";
 
 // Role definitions with descriptions
 const roleDefinitions = {
@@ -98,21 +99,21 @@ export default function AdminsPage() {
       setError(null);
       const response = await adminApi.getAdmins();
       
-      console.log('Raw API response:', response);
+      devLog('Raw API response:', response);
       
       // Ensure we always set an array
       let adminsList = [];
       if (response && response.admins && Array.isArray(response.admins)) {
         adminsList = response.admins;
-        console.log('Using response.admins:', adminsList);
+        devLog('Using response.admins:', adminsList);
       } else if (response && Array.isArray(response)) {
         adminsList = response;
-        console.log('Using response as array:', adminsList);
+        devLog('Using response as array:', adminsList);
       } else if (response && response.data && Array.isArray(response.data)) {
         adminsList = response.data;
-        console.log('Using response.data:', adminsList);
+        devLog('Using response.data:', adminsList);
       } else {
-        console.warn('Unexpected response format:', response);
+        devLog('Unexpected response format:', response);
       }
       
       // Filter out any invalid admin objects and normalize them
@@ -122,11 +123,11 @@ export default function AdminsPage() {
         .filter((admin: Admin) => admin.role !== 'super_admin'); // Hide super admins from table
       
       setAdmins(adminsList);
-      console.log('Final admins list:', adminsList);
+      devLog('Final admins list:', adminsList);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch admins';
       setError(errorMessage);
-      console.error('Error fetching admins:', err);
+      devError('Error fetching admins:', err);
       setAdmins([]); // Ensure we set an empty array on error
     } finally {
       setLoading(false);
@@ -136,7 +137,7 @@ export default function AdminsPage() {
   useEffect(() => {
     // Get current user info
     const user = authApi.getStoredUser();
-    console.log('Current user from storage:', user); // Debug log
+    devLog('Current user from storage:', user);
     if (user) {
       setCurrentUser(user as Admin);
     }

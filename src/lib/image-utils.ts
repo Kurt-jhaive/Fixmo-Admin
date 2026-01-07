@@ -1,6 +1,7 @@
 /**
  * Utility functions for handling image URLs and Cloudinary integration
  */
+import { devLog } from './logger';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
@@ -11,21 +12,21 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 export function getImageUrl(imagePath?: string | null): string | null {
   if (!imagePath) return null;
 
-  // Debug logging
-  console.log('🔍 getImageUrl input:', imagePath);
+  // Debug logging (only in development)
+  devLog('🔍 getImageUrl input:', imagePath);
 
   // If it's already a full URL (http/https), return as is
   if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
-    console.log('✅ getImageUrl output (full URL):', imagePath);
+    devLog('✅ getImageUrl output (full URL):', imagePath);
     return imagePath;
   }
 
   // SPECIAL CASE: Handle backend bug where Cloudinary URLs are prefixed with /uploads/
   // Example: "/uploads/https://res.cloudinary.com/..." should become "https://res.cloudinary.com/..."
-  console.log('🔍 Checking uploads prefix:', imagePath.startsWith('/uploads/https://'), imagePath.startsWith('/uploads/http://'));
+  devLog('🔍 Checking uploads prefix:', imagePath.startsWith('/uploads/https://'), imagePath.startsWith('/uploads/http://'));
   if (imagePath.startsWith('/uploads/https://') || imagePath.startsWith('/uploads/http://')) {
     const cleanUrl = imagePath.replace('/uploads/', '');
-    console.log('✅ getImageUrl output (cleaned uploads prefix):', cleanUrl);
+    devLog('✅ getImageUrl output (cleaned uploads prefix):', cleanUrl);
     return cleanUrl;
   }
 
@@ -33,12 +34,12 @@ export function getImageUrl(imagePath?: string | null): string | null {
   if (imagePath.includes('cloudinary.com')) {
     // If it already starts with http/https, return as-is (this should have been caught earlier but safety check)
     if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
-      console.log('✅ getImageUrl output (cloudinary full URL):', imagePath);
+      devLog('✅ getImageUrl output (cloudinary full URL):', imagePath);
       return imagePath;
     }
     // If it doesn't start with http, add https
     const cloudinaryUrl = imagePath.startsWith('//') ? `https:${imagePath}` : `https://${imagePath}`;
-    console.log('✅ getImageUrl output (cloudinary):', cloudinaryUrl);
+    devLog('✅ getImageUrl output (cloudinary):', cloudinaryUrl);
     return cloudinaryUrl;
   }
 
@@ -46,20 +47,20 @@ export function getImageUrl(imagePath?: string | null): string | null {
   // This happens when the backend stores URLs like "res.cloudinary.com/..." instead of "https://res.cloudinary.com/..."
   if (imagePath.includes('res.cloudinary.com')) {
     const cloudinaryUrl = imagePath.startsWith('//') ? `https:${imagePath}` : `https://${imagePath}`;
-    console.log('✅ getImageUrl output (cloudinary without protocol):', cloudinaryUrl);
+    devLog('✅ getImageUrl output (cloudinary without protocol):', cloudinaryUrl);
     return cloudinaryUrl;
   }
 
   // If it starts with a forward slash, it's a relative path from the API
   if (imagePath.startsWith('/')) {
     const relativeUrl = `${API_BASE_URL}${imagePath}`;
-    console.log('✅ getImageUrl output (relative):', relativeUrl);
+    devLog('✅ getImageUrl output (relative):', relativeUrl);
     return relativeUrl;
   }
 
   // If it doesn't start with a slash, assume it's in the uploads directory
   const uploadsUrl = `${API_BASE_URL}/uploads/${imagePath}`;
-  console.log('✅ getImageUrl output (uploads):', uploadsUrl);
+  devLog('✅ getImageUrl output (uploads):', uploadsUrl);
   return uploadsUrl;
 }
 
@@ -68,7 +69,7 @@ export function getImageUrl(imagePath?: string | null): string | null {
  */
 export function shouldUseNextImage(imageUrl?: string | null): boolean {
   if (!imageUrl) {
-    console.log('🚫 shouldUseNextImage: No URL provided, returning false');
+    devLog('🚫 shouldUseNextImage: No URL provided, returning false');
     return false;
   }
   
@@ -77,7 +78,7 @@ export function shouldUseNextImage(imageUrl?: string | null): boolean {
   const isCloudinary = imageUrl.includes('cloudinary.com');
   const shouldUse = !isExternal && !isCloudinary;
   
-  console.log('🎯 shouldUseNextImage:', { 
+  devLog('🎯 shouldUseNextImage:', { 
     url: imageUrl, 
     isExternal, 
     isCloudinary, 

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import SmartImage from "@/components/SmartImage";
 import type { ServiceProvider } from "@/lib/api";
+import { devLog } from "@/lib/logger";
 
 interface ReviewProviderModalProps {
   isOpen: boolean;
@@ -47,11 +48,11 @@ export default function ReviewProviderModal({
 
   const cleanValidIdUrl = getCleanImageUrl(provider.provider_valid_id);
 
-  // Debug: Log the ID URL
-  console.log('🔍 ReviewProviderModal - Provider Valid ID URL (original):', provider.provider_valid_id);
-  console.log('🔍 ReviewProviderModal - Provider Valid ID URL (cleaned):', cleanValidIdUrl);
-  console.log('🔍 ReviewProviderModal - Provider Valid ID Type:', typeof provider.provider_valid_id);
-  console.log('🔍 ReviewProviderModal - Full Provider Data:', provider);
+  // Debug logging (only in development)
+  devLog('🔍 ReviewProviderModal - Provider Valid ID URL (original):', provider.provider_valid_id);
+  devLog('🔍 ReviewProviderModal - Provider Valid ID URL (cleaned):', cleanValidIdUrl);
+  devLog('🔍 ReviewProviderModal - Provider Valid ID Type:', typeof provider.provider_valid_id);
+  devLog('🔍 ReviewProviderModal - Full Provider Data:', provider);
 
   return (
     <>
@@ -174,10 +175,10 @@ export default function ReviewProviderModal({
                             className="w-full h-full object-contain rounded"
                             style={{ minHeight: '250px', maxHeight: '350px' }}
                             onError={() => {
-                              console.error('❌ Image failed to load:', cleanValidIdUrl);
+                              devLog('❌ Image failed to load:', cleanValidIdUrl);
                             }}
                             onLoad={() => {
-                              console.log('✅ Image loaded successfully:', cleanValidIdUrl);
+                              devLog('✅ Image loaded successfully:', cleanValidIdUrl);
                             }}
                           />
                         </div>

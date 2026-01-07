@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { isTokenExpired } from '@/lib/auth-utils';
+import { devLog } from '@/lib/logger';
 
 interface AuthWrapperProps {
   children: React.ReactNode;
@@ -14,13 +15,13 @@ export default function AuthWrapper({ children }: AuthWrapperProps) {
 
   useEffect(() => {
     const checkAuth = () => {
-      console.log('AuthWrapper: Checking authentication...');
+      devLog('AuthWrapper: Checking authentication...');
       const token = localStorage.getItem('token') || localStorage.getItem('adminToken');
-      console.log('AuthWrapper: Token found =', !!token);
+      devLog('AuthWrapper: Token found =', !!token);
       
       // Check if token exists and is not expired
       if (!token || isTokenExpired(token)) {
-        console.log('AuthWrapper: No token or token expired, redirecting to login...');
+        devLog('AuthWrapper: No token or token expired, redirecting to login...');
         setIsAuthenticated(false);
         // Clear auth data but don't redirect here
         localStorage.removeItem('token');
@@ -34,7 +35,7 @@ export default function AuthWrapper({ children }: AuthWrapperProps) {
       }
       
       // Token exists and is valid
-      console.log('AuthWrapper: Token is valid, user authenticated');
+      devLog('AuthWrapper: Token is valid, user authenticated');
       setIsAuthenticated(true);
     };
 

@@ -1,7 +1,8 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://fixmo-backend-production.up.railway.app';
 import { isTokenExpired } from './auth-utils';
+import { devLog, devError } from './logger';
 
-console.log('API_BASE_URL:', API_BASE_URL); // Debug log
+devLog('API_BASE_URL:', API_BASE_URL);
 
 // Evidence interface for backjobs
 export interface Evidence {
@@ -83,7 +84,7 @@ export const authApi = {
         },
       });
     } catch (error) {
-      console.error('Logout API call failed:', error);
+      devError('Logout API call failed:', error);
     }
 
     // Always clear all auth data
@@ -136,7 +137,7 @@ export const authApi = {
       // Check if token is expired (exp is in seconds)
       return payload.exp && payload.exp < currentTime;
     } catch (error) {
-      console.error('Error parsing token:', error);
+      devError('Error parsing token:', error);
       return true; // Treat invalid tokens as expired
     }
   },
@@ -209,7 +210,7 @@ const getAuthHeaders = (): HeadersInit => {
 // Test if backend is reachable
 export const testBackendConnection = async () => {
   try {
-    console.log('Testing backend connection to:', API_BASE_URL);
+    devLog('Testing backend connection to:', API_BASE_URL);
     
     // Try to fetch with a timeout and proper error handling
     const controller = new AbortController();
@@ -227,12 +228,12 @@ export const testBackendConnection = async () => {
     });
     
     clearTimeout(timeoutId);
-    console.log('Backend connection test - Status:', response.status);
+    devLog('Backend connection test - Status:', response.status);
     
     // Consider any response (even errors) as "connected"
     return response.status < 500; // Only network/server errors are "disconnected"
   } catch (error) {
-    console.error('Backend connection test failed:', error);
+    devError('Backend connection test failed:', error);
     return false;
   }
 };
@@ -247,18 +248,18 @@ export const adminApi = {
     });
     
     const url = `${API_BASE_URL}/api/admin/users?${params}`;
-    console.log('Fetching users from:', url); // Debug log
+    devLog('Fetching users from:', url);
     
     const response = await makeAuthenticatedRequest(url);
-    console.log('Users response status:', response.status); // Debug log
+    devLog('Users response status:', response.status);
     
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Users fetch error:', errorText); // Debug log
+      devError('Users fetch error:', errorText);
       throw new Error(`Failed to fetch users: ${response.status} ${errorText}`);
     }
     const data = await response.json();
-    console.log('Users data received:', data); // Debug log
+    devLog('Users data received:', data);
     return data;
   },
 
@@ -313,21 +314,21 @@ export const adminApi = {
     });
     
     const url = `${API_BASE_URL}/api/admin/providers?${params}`;
-    console.log('Fetching providers from:', url); // Debug log
+    devLog('Fetching providers from:', url);
     
     const response = await fetch(url, {
       headers: getAuthHeaders(),
     });
-    console.log('Providers response status:', response.status); // Debug log
+    devLog('Providers response status:', response.status);
     
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Providers fetch error:', errorText); // Debug log
+      devError('Providers fetch error:', errorText);
       throw new Error(`Failed to fetch providers: ${response.status} ${errorText}`);
     }
     
     const data = await response.json();
-    console.log('Providers data received:', data); // Debug log
+    devLog('Providers data received:', data);
     return data;
   },
 
@@ -395,7 +396,7 @@ export const adminApi = {
       if (value !== undefined && value !== '') params.append(key, String(value));
     });
     
-    console.log('📤 API: Sending GET request to /api/admin/certificates with params:', params.toString());
+    devLog('📤 API: Sending GET request to /api/admin/certificates with params:', params.toString());
     
     const response = await fetch(`${API_BASE_URL}/api/admin/certificates?${params}`, {
       headers: getAuthHeaders(),
@@ -403,7 +404,7 @@ export const adminApi = {
     if (!response.ok) throw new Error('Failed to fetch certificates');
     const data = await response.json();
     
-    console.log('📥 API: Received response from backend:', {
+    devLog('📥 API: Received response from backend:', {
       count: (data.certificates || data || []).length,
       hasFilters: params.toString() !== ''
     });
@@ -450,7 +451,7 @@ export const adminApi = {
 
   // Dashboard Stats - Aggregate from existing endpoints
   async getDashboardStats() {
-    console.log('Fetching dashboard stats by aggregating data...'); // Debug log
+    devLog('Fetching dashboard stats by aggregating data...');
     
     try {
       // Fetch data from multiple endpoints to calculate stats
@@ -462,10 +463,10 @@ export const adminApi = {
         fetch(`${API_BASE_URL}/api/appointments?limit=1`, { headers: getAuthHeaders() })
       ]);
 
-      console.log('Users response status:', usersResponse.status);
-      console.log('Providers response status:', providersResponse.status);
-      console.log('Certificates response status:', certificatesResponse.status);
-      console.log('Appointments response status:', appointmentsResponse.status);
+      devLog('Users response status:', usersResponse.status);
+      devLog('Providers response status:', providersResponse.status);
+      devLog('Certificates response status:', certificatesResponse.status);
+      devLog('Appointments response status:', appointmentsResponse.status);
 
       // Handle responses
       const users = usersResponse.ok ? await usersResponse.json() : { users: [] };
@@ -473,12 +474,12 @@ export const adminApi = {
       const certificates = certificatesResponse.ok ? await certificatesResponse.json() : { certificates: [] };
       const appointments = appointmentsResponse.ok ? await appointmentsResponse.json() : { data: [], pagination: { total: 0 } };
 
-      console.log('Users data:', users);
-      console.log('Providers data:', providers);
-      console.log('Certificates data:', certificates);
-      console.log('Appointments data:', appointments);
-      console.log('Appointments pagination:', appointments.pagination);
-      console.log('Total appointments from API:', appointments.pagination?.total);
+      devLog('Users data:', users);
+      devLog('Providers data:', providers);
+      devLog('Certificates data:', certificates);
+      devLog('Appointments data:', appointments);
+      devLog('Appointments pagination:', appointments.pagination);
+      devLog('Total appointments from API:', appointments.pagination?.total);
 
       // Calculate stats
       const stats = {
@@ -495,10 +496,10 @@ export const adminApi = {
         totalAppointments: appointments.pagination?.total ?? appointments.pagination?.totalCount ?? (Array.isArray(appointments.data) ? appointments.data.length : 0),
       };
 
-      console.log('Calculated dashboard stats:', stats);
+      devLog('Calculated dashboard stats:', stats);
       return stats;
     } catch (error) {
-      console.error('Error fetching dashboard stats:', error);
+      devError('Error fetching dashboard stats:', error);
       // Return fallback stats
       return {
         totalUsers: 0,
@@ -512,51 +513,51 @@ export const adminApi = {
 
   async getRecentActivity() {
     const url = `${API_BASE_URL}/api/admin/recent-activity`;
-    console.log('Fetching recent activity from:', url); // Debug log
+    devLog('Fetching recent activity from:', url);
     
     const response = await fetch(url, {
       headers: getAuthHeaders(),
     });
-    console.log('Recent activity response status:', response.status); // Debug log
+    devLog('Recent activity response status:', response.status);
     
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Recent activity fetch error:', errorText); // Debug log
+      devError('Recent activity fetch error:', errorText);
       throw new Error(`Failed to fetch recent activity: ${response.status} ${errorText}`);
     }
     
     const data = await response.json();
-    console.log('Recent activity data received:', data); // Debug log
+    devLog('Recent activity data received:', data);
     return data;
   },
 
   // Admin Management (Super Admin Only)
   async getAdmins() {
-    console.log('Fetching admins from:', `${API_BASE_URL}/api/admin/`);
+    devLog('Fetching admins from:', `${API_BASE_URL}/api/admin/`);
     const response = await fetch(`${API_BASE_URL}/api/admin/`, {
       headers: getAuthHeaders(),
     });
-    console.log('Admins response status:', response.status);
+    devLog('Admins response status:', response.status);
     
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Admins fetch error:', errorText);
+      devError('Admins fetch error:', errorText);
       throw new Error(`Failed to fetch admins: ${response.status} ${errorText}`);
     }
     
     const data = await response.json();
-    console.log('Admins data received:', data);
+    devLog('Admins data received:', data);
     return data;
   },
 
   async getAdminById(adminId: number) {
-    console.log('Fetching admin by ID:', adminId);
+    devLog('Fetching admin by ID:', adminId);
     const response = await fetch(`${API_BASE_URL}/api/admin/${adminId}`, {
       headers: getAuthHeaders(),
     });
     
     if (!response.ok) {
-      console.error('Admin fetch error:', response.status);
+      devError('Admin fetch error:', response.status);
       return null; // Return null if admin not found
     }
     
@@ -886,16 +887,16 @@ export const appointmentsApi = {
 
       // Use the exact endpoint from the API documentation
       const url = `${API_BASE_URL}/api/appointments/backjobs${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
-      console.log('Fetching backjobs from:', url);
-      console.log('Query params:', Object.fromEntries(queryParams));
+      devLog('Fetching backjobs from:', url);
+      devLog('Query params:', Object.fromEntries(queryParams));
 
       const response = await makeAuthenticatedRequest(url);
 
-      console.log('Response status:', response.status);
+      devLog('Response status:', response.status);
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('Error response:', errorText);
+        devError('Error response:', errorText);
         let error;
         try {
           error = JSON.parse(errorText);
@@ -906,10 +907,10 @@ export const appointmentsApi = {
       }
 
       const data = await response.json();
-      console.log('Backjobs data received:', data);
+      devLog('Backjobs data received:', data);
       return data;
     } catch (error) {
-      console.error('Error in getBackjobs:', error);
+      devError('Error in getBackjobs:', error);
       throw error;
     }
   },
@@ -1353,16 +1354,16 @@ export const penaltyApi = {
     });
 
     const url = `${API_BASE_URL}/api/penalty/admin/adjustment-logs?${queryParams.toString()}`;
-    console.log('Fetching adjustment logs from:', url);
+    devLog('Fetching adjustment logs from:', url);
     
     try {
       const response = await makeAuthenticatedRequest(url);
       
-      console.log('Adjustment logs response status:', response.status);
+      devLog('Adjustment logs response status:', response.status);
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('Adjustment logs error response:', errorText);
+        devError('Adjustment logs error response:', errorText);
         
         try {
           const error = JSON.parse(errorText);
@@ -1374,11 +1375,11 @@ export const penaltyApi = {
       }
 
       const data = await response.json();
-      console.log('Adjustment logs response data:', data);
+      devLog('Adjustment logs response data:', data);
       return data;
     } catch (err) {
       const error = err as Error;
-      console.error('Error in getAdjustmentLogs:', error);
+      devError('Error in getAdjustmentLogs:', error);
       throw error;
     }
   },
@@ -1437,15 +1438,15 @@ export const getAdminName = async (adminId: number | null | undefined): Promise<
   
   // Fetch from API
   try {
-    console.log('🔍 Fetching admin name for ID:', adminId);
+    devLog('🔍 Fetching admin name for ID:', adminId);
     const admin = await adminApi.getAdminById(adminId);
-    console.log('✅ Admin data received:', admin);
+    devLog('✅ Admin data received:', admin);
     if (admin && admin.name) {
       adminCache.set(adminId, { name: admin.name, email: admin.email || '' });
       return admin.name; // Return just the name
     }
   } catch (error) {
-    console.error('❌ Error fetching admin name for ID', adminId, ':', error);
+    devError('❌ Error fetching admin name for ID', adminId, ':', error);
   }
   
   // Fallback - return just the ID if name can't be fetched

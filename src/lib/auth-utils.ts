@@ -1,6 +1,7 @@
 /**
  * Authentication utility functions
  */
+import { devError } from './logger';
 
 /**
  * Check if JWT token is expired
@@ -25,7 +26,7 @@ export function isTokenExpired(token?: string | null): boolean {
 
     return currentTime >= expirationTime;
   } catch (error) {
-    console.error('Error checking token expiration:', error);
+    devError('Error checking token expiration:', error);
     return true; // If we can't decode it, consider it expired
   }
 }

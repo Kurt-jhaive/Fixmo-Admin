@@ -5,6 +5,10 @@ const nextConfig: NextConfig = {
   outputFileTracingIncludes: {
     '/': ['./src/**/*'],
   },
+  // Disable source maps in production to prevent information disclosure
+  productionBrowserSourceMaps: false,
+  // Disable X-Powered-By header to prevent information leakage (ZAP Alert 10037)
+  poweredByHeader: false,
   // Security headers configuration
   async headers() {
     return [
@@ -12,6 +16,23 @@ const nextConfig: NextConfig = {
         // Apply security headers to all routes
         source: '/:path*',
         headers: [
+          // Content Security Policy (CSP) - Prevents XSS attacks (ZAP Alert 10038 - Medium Risk)
+          {
+            key: 'Content-Security-Policy',
+            value: [
+              "default-src 'self'",
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+              "style-src 'self' 'unsafe-inline'",
+              "img-src 'self' data: blob: https://res.cloudinary.com https://*.cloudinary.com https://fixmo-backend-production.up.railway.app",
+              "font-src 'self' data:",
+              "connect-src 'self' https://fixmo-backend-production.up.railway.app https://res.cloudinary.com",
+              "frame-ancestors 'none'",
+              "form-action 'self'",
+              "base-uri 'self'",
+              "object-src 'none'",
+              "upgrade-insecure-requests",
+            ].join('; '),
+          },
           // Prevent clickjacking attacks - X-Frame-Options
           {
             key: 'X-Frame-Options',
@@ -42,6 +63,29 @@ const nextConfig: NextConfig = {
             key: 'Permissions-Policy',
             value: 'camera=(), microphone=(), geolocation=(), interest-cohort=()',
           },
+          // Cache-Control for security - prevent caching of sensitive pages
+          {
+            key: 'Cache-Control',
+            value: 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          },
+          {
+            key: 'Pragma',
+            value: 'no-cache',
+          },
+          {
+            key: 'Expires',
+            value: '0',
+          },
+        ],
+      },
+      {
+        // Static assets can be cached
+        source: '/_next/static/:path*',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable',
+          },
         ],
       },
     ];
@@ -69,17 +113,12 @@ const nextConfig: NextConfig = {
         hostname: '*.cloudinary.com',
         pathname: '/**',
       },
-      // Add support for any other domains you might be using
-      {
-        protocol: 'http',
-        hostname: '**',
-        pathname: '/**',
-      },
+      // Backend API for user images
       {
         protocol: 'https',
-        hostname: '**',
+        hostname: 'fixmo-backend-production.up.railway.app',
         pathname: '/**',
-      }
+      },
     ],
     dangerouslyAllowSVG: true,
     contentDispositionType: 'attachment',

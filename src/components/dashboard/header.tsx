@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { authApi } from '@/lib/api';
+import { devLog, devError } from '@/lib/logger';
 
 interface User {
   id: number;
@@ -43,7 +44,7 @@ export function Header() {
   }, []);
 
   const handleLogout = async () => {
-    console.log('Logout: Starting logout process...');
+    devLog('Logout: Starting logout process...');
     setShowUserMenu(false); // Close the menu immediately
     
     try {
@@ -54,13 +55,13 @@ export function Header() {
       authApi.clearAuth();
       
       // Call logout API (optional, don't wait for it)
-      authApi.logout().catch(err => console.error('Logout API error:', err));
+      authApi.logout().catch(err => devError('Logout API error:', err));
       
-      console.log('Logout: Redirecting to login...');
+      devLog('Logout: Redirecting to login...');
       // Force redirect to login
       router.replace('/login');
     } catch (error) {
-      console.error('Logout error:', error);
+      devError('Logout error:', error);
       // Even if anything fails, still logout locally
       setUser(null);
       authApi.clearAuth();

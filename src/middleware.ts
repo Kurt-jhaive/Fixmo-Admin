@@ -10,9 +10,32 @@ const allowedOrigins = [
   'http://localhost:3000',
 ];
 
+// Security utility: Strip sensitive parameters from URL for redirects (ZAP Alert 10044 - Medium Risk)
+function sanitizeRedirectUrl(url: URL): URL {
+  const sensitiveParams = ['password', 'token', 'secret', 'key', 'auth', 'credential', 'session'];
+  const sanitizedUrl = new URL(url.toString());
+  
+  sensitiveParams.forEach(param => {
+    if (sanitizedUrl.searchParams.has(param)) {
+      sanitizedUrl.searchParams.delete(param);
+    }
+  });
+  
+  return sanitizedUrl;
+}
+
 export function middleware(request: NextRequest) {
   const response = NextResponse.next();
   const origin = request.headers.get('origin');
+
+  // Security: Remove sensitive query parameters from login URLs (ZAP Alert 10044)
+  const url = new URL(request.url);
+  if (url.pathname === '/login' && (url.searchParams.has('password') || url.searchParams.has('username'))) {
+    // Redirect to clean login URL without sensitive params in URL
+    const cleanUrl = sanitizeRedirectUrl(url);
+    cleanUrl.searchParams.delete('username'); // Also remove username from URL for security
+    return NextResponse.redirect(cleanUrl, { status: 302 });
+  }
 
   // CORS handling - only allow specific origins
   if (origin) {

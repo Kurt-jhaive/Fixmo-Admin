@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { adminApi } from '@/lib/api';
+import { devLog, devError } from '@/lib/logger';
 
 interface Account {
   id: number;
@@ -97,7 +98,7 @@ export default function AdjustPointsModal({ isOpen, onClose, onSubmit }: AdjustP
       setShowDropdown(true);
 
       try {
-        console.log('Searching for:', searchTerm);
+        devLog('Searching for:', searchTerm);
         
         // Search both users and providers
         const [usersResponse, providersResponse] = await Promise.all([
@@ -105,15 +106,15 @@ export default function AdjustPointsModal({ isOpen, onClose, onSubmit }: AdjustP
           adminApi.getProviders({ search: searchTerm, limit: 5 })
         ]);
 
-        console.log('Users response:', usersResponse);
-        console.log('Providers response:', providersResponse);
+        devLog('Users response:', usersResponse);
+        devLog('Providers response:', providersResponse);
 
         // Handle different response formats - API might return array directly or wrapped in object
         const usersArray = Array.isArray(usersResponse) ? usersResponse : (usersResponse.users || usersResponse.data || []);
         const providersArray = Array.isArray(providersResponse) ? providersResponse : (providersResponse.providers || providersResponse.data || []);
 
-        console.log('Users array:', usersArray);
-        console.log('Providers array:', providersArray);
+        devLog('Users array:', usersArray);
+        devLog('Providers array:', providersArray);
 
         const users: Account[] = (usersArray || [])
           .filter((user: UserResponse) => user.user_id && (user.user_name || user.first_name))
@@ -148,14 +149,14 @@ export default function AdjustPointsModal({ isOpen, onClose, onSubmit }: AdjustP
                  idStr.includes(searchLower);
         });
 
-        console.log('Mapped users:', users);
-        console.log('Mapped providers:', providers);
-        console.log('Total results before filter:', allResults.length);
-        console.log('Filtered results:', filteredResults.length);
+        devLog('Mapped users:', users);
+        devLog('Mapped providers:', providers);
+        devLog('Total results before filter:', allResults.length);
+        devLog('Filtered results:', filteredResults.length);
 
         setSearchResults(filteredResults);
       } catch (error) {
-        console.error('Error searching accounts:', error);
+        devError('Error searching accounts:', error);
         setSearchResults([]);
       } finally {
         setIsSearching(false);

@@ -1,6 +1,7 @@
 import React from 'react';
 import Image from 'next/image';
 import { getImageUrl, handleImageError, getPlaceholderImage, shouldUseNextImage } from '@/lib/image-utils';
+import { devLog } from '@/lib/logger';
 
 interface SmartImageProps {
   src?: string | null;
@@ -36,7 +37,7 @@ export function SmartImage({
   const useNextImage = shouldUseNextImage(imageUrl);
   const finalImageUrl = imageUrl || getPlaceholderImage(fallbackType);
 
-  console.log('🖼️ SmartImage DEBUG:', { 
+  devLog('🖼️ SmartImage DEBUG:', { 
     originalSrc: src, 
     processedUrl: imageUrl, 
     useNextImage, 
