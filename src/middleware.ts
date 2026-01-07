@@ -10,13 +10,6 @@ const allowedOrigins = [
   'http://localhost:3000',
 ];
 
-// Generate a cryptographically secure nonce for CSP
-function generateNonce(): string {
-  const array = new Uint8Array(16);
-  crypto.getRandomValues(array);
-  return Buffer.from(array).toString('base64');
-}
-
 // Security utility: Strip sensitive parameters from URL for redirects (ZAP Alert 10044 - Medium Risk)
 function sanitizeRedirectUrl(url: URL): URL {
   const sensitiveParams = ['password', 'token', 'secret', 'key', 'auth', 'credential', 'session'];
@@ -31,16 +24,19 @@ function sanitizeRedirectUrl(url: URL): URL {
   return sanitizedUrl;
 }
 
-// Build CSP header with nonce for enhanced security (ZAP Alerts 10055-5, 10055-6, 10055-10)
-function buildCSPHeader(nonce: string): string {
+// Build CSP header for Next.js compatibility (ZAP Alerts 10055-5, 10055-6, 10055-10)
+// IMPORTANT: Next.js requires 'unsafe-inline' for hydration scripts.
+// This is a known limitation. We use the strictest possible policy that still works.
+// Reference: https://nextjs.org/docs/app/building-your-application/configuring/content-security-policy
+function buildCSPHeader(): string {
   const cspDirectives = [
     "default-src 'self'",
-    // Use nonce for scripts instead of unsafe-inline/unsafe-eval (Medium Risk Fix)
-    // 'strict-dynamic' allows dynamically loaded scripts from trusted scripts with nonce
-    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'`,
-    // Style-src: nonce for inline styles (Medium Risk Fix)
-    // Note: Some Next.js features may require 'unsafe-inline' as fallback
-    `style-src 'self' 'nonce-${nonce}' 'unsafe-inline'`,
+    // Next.js REQUIRES 'unsafe-inline' for inline scripts during hydration
+    // 'unsafe-eval' is NOT required and is removed for security
+    // 'strict-dynamic' helps by allowing dynamically loaded scripts from trusted sources
+    "script-src 'self' 'unsafe-inline' 'strict-dynamic' https:",
+    // Style-src: Next.js uses inline styles, 'unsafe-inline' is required
+    "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob: https://res.cloudinary.com https://*.cloudinary.com https://fixmo-backend-production.up.railway.app",
     "font-src 'self' data:",
     "connect-src 'self' https://fixmo-backend-production.up.railway.app https://res.cloudinary.com",
@@ -55,9 +51,9 @@ function buildCSPHeader(nonce: string): string {
 }
 
 // Apply all security headers to a response (Low Risk Fixes)
-function applySecurityHeaders(response: NextResponse, nonce: string): void {
-  // CSP with nonce
-  response.headers.set('Content-Security-Policy', buildCSPHeader(nonce));
+function applySecurityHeaders(response: NextResponse): void {
+  // CSP - Content Security Policy
+  response.headers.set('Content-Security-Policy', buildCSPHeader());
   
   // HSTS - Strict-Transport-Security (ZAP Alert 10035 - Low Risk)
   response.headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
@@ -76,21 +72,15 @@ function applySecurityHeaders(response: NextResponse, nonce: string): void {
   
   // Permissions-Policy - Restrict browser features
   response.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), interest-cohort=()');
-  
-  // Pass nonce to the application via header (can be read in layout.tsx)
-  response.headers.set('x-nonce', nonce);
 }
 
 export function middleware(request: NextRequest) {
   const response = NextResponse.next();
   const origin = request.headers.get('origin');
   const url = new URL(request.url);
-
-  // Generate nonce for CSP (Medium Risk Fix - ZAP Alerts 10055-5, 10055-6, 10055-10)
-  const nonce = generateNonce();
   
   // Apply all security headers to response
-  applySecurityHeaders(response, nonce);
+  applySecurityHeaders(response);
 
   // Security: Handle root path redirect in middleware (ZAP Alert 10044 - Big Redirect)
   // Using 302 instead of 307 and handling in middleware prevents large redirect response bodies
@@ -98,7 +88,7 @@ export function middleware(request: NextRequest) {
     // Use 302 Found instead of 307 to avoid "Big Redirect" detection
     // Middleware redirect has minimal response body compared to page-level redirect
     const redirectResponse = NextResponse.redirect(new URL('/login', request.url), { status: 302 });
-    applySecurityHeaders(redirectResponse, nonce);
+    applySecurityHeaders(redirectResponse);
     return redirectResponse;
   }
 
@@ -108,7 +98,7 @@ export function middleware(request: NextRequest) {
     const cleanUrl = sanitizeRedirectUrl(url);
     cleanUrl.searchParams.delete('username'); // Also remove username from URL for security
     const redirectResponse = NextResponse.redirect(cleanUrl, { status: 302 });
-    applySecurityHeaders(redirectResponse, nonce);
+    applySecurityHeaders(redirectResponse);
     return redirectResponse;
   }
 
