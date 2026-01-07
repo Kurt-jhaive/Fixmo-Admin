@@ -1,8 +1,8 @@
 {
 	"@programName": "ZAP",
 	"@version": "2.17.0",
-	"@generated": "Wed, 7 Jan 2026 19:37:11",
-	"created": "2026-01-07T11:37:11.599101500Z",
+	"@generated": "Wed, 7 Jan 2026 19:45:26",
+	"created": "2026-01-07T11:45:26.300385100Z",
 	"insights":[
 		{
 			"level": "Low",
@@ -18,7 +18,7 @@
 			"site": "",
 			"key": "insight.log.warn",
 			"description": "ZAP warnings logged - see the zap.log file for details",
-			"statistic": "8"
+			"statistic": "10"
 		},
 		{
 			"level": "Info",
@@ -114,7 +114,7 @@
 			"site": "https://fixmo-admin.vercel.app",
 			"key": "insight.code.2xx",
 			"description": "Percentage of responses with status code 2xx",
-			"statistic": "38"
+			"statistic": "29"
 		},
 		{
 			"level": "Info",
@@ -122,7 +122,7 @@
 			"site": "https://fixmo-admin.vercel.app",
 			"key": "insight.code.3xx",
 			"description": "Percentage of responses with status code 3xx",
-			"statistic": "22"
+			"statistic": "18"
 		},
 		{
 			"level": "Info",
@@ -130,7 +130,7 @@
 			"site": "https://fixmo-admin.vercel.app",
 			"key": "insight.code.4xx",
 			"description": "Percentage of responses with status code 4xx",
-			"statistic": "38"
+			"statistic": "51"
 		},
 		{
 			"level": "Info",
@@ -138,7 +138,7 @@
 			"site": "https://fixmo-admin.vercel.app",
 			"key": "insight.endpoint.ctype.application/javascript",
 			"description": "Percentage of endpoints with content type application/javascript",
-			"statistic": "43"
+			"statistic": "41"
 		},
 		{
 			"level": "Info",
@@ -146,7 +146,7 @@
 			"site": "https://fixmo-admin.vercel.app",
 			"key": "insight.endpoint.ctype.font/woff2",
 			"description": "Percentage of endpoints with content type font/woff2",
-			"statistic": "12"
+			"statistic": "11"
 		},
 		{
 			"level": "Info",
@@ -154,7 +154,7 @@
 			"site": "https://fixmo-admin.vercel.app",
 			"key": "insight.endpoint.ctype.image/x-icon",
 			"description": "Percentage of endpoints with content type image/x-icon",
-			"statistic": "6"
+			"statistic": "5"
 		},
 		{
 			"level": "Info",
@@ -162,7 +162,7 @@
 			"site": "https://fixmo-admin.vercel.app",
 			"key": "insight.endpoint.ctype.text/css",
 			"description": "Percentage of endpoints with content type text/css",
-			"statistic": "6"
+			"statistic": "11"
 		},
 		{
 			"level": "Info",
@@ -170,7 +170,7 @@
 			"site": "https://fixmo-admin.vercel.app",
 			"key": "insight.endpoint.ctype.text/html",
 			"description": "Percentage of endpoints with content type text/html",
-			"statistic": "25"
+			"statistic": "23"
 		},
 		{
 			"level": "Info",
@@ -178,7 +178,7 @@
 			"site": "https://fixmo-admin.vercel.app",
 			"key": "insight.endpoint.ctype.text/plain",
 			"description": "Percentage of endpoints with content type text/plain",
-			"statistic": "6"
+			"statistic": "5"
 		},
 		{
 			"level": "Info",
@@ -194,7 +194,7 @@
 			"site": "https://fixmo-admin.vercel.app",
 			"key": "insight.endpoint.total",
 			"description": "Count of total endpoints",
-			"statistic": "16"
+			"statistic": "17"
 		},
 		{
 			"level": "Info",
@@ -202,7 +202,7 @@
 			"site": "https://fixmo-admin.vercel.app",
 			"key": "insight.response.slow",
 			"description": "Percentage of slow responses",
-			"statistic": "7"
+			"statistic": "10"
 		},
 		{
 			"level": "Info",

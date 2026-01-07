@@ -54,6 +54,33 @@ function buildCSPHeader(nonce: string): string {
   return cspDirectives.join('; ');
 }
 
+// Apply all security headers to a response (Low Risk Fixes)
+function applySecurityHeaders(response: NextResponse, nonce: string): void {
+  // CSP with nonce
+  response.headers.set('Content-Security-Policy', buildCSPHeader(nonce));
+  
+  // HSTS - Strict-Transport-Security (ZAP Alert 10035 - Low Risk)
+  response.headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
+  
+  // X-Content-Type-Options - Prevent MIME sniffing (ZAP Alert 10021 - Low Risk)
+  response.headers.set('X-Content-Type-Options', 'nosniff');
+  
+  // X-Frame-Options - Prevent clickjacking
+  response.headers.set('X-Frame-Options', 'DENY');
+  
+  // X-XSS-Protection - Legacy XSS protection for older browsers
+  response.headers.set('X-XSS-Protection', '1; mode=block');
+  
+  // Referrer-Policy - Control referrer information
+  response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+  
+  // Permissions-Policy - Restrict browser features
+  response.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), interest-cohort=()');
+  
+  // Pass nonce to the application via header (can be read in layout.tsx)
+  response.headers.set('x-nonce', nonce);
+}
+
 export function middleware(request: NextRequest) {
   const response = NextResponse.next();
   const origin = request.headers.get('origin');
@@ -62,12 +89,8 @@ export function middleware(request: NextRequest) {
   // Generate nonce for CSP (Medium Risk Fix - ZAP Alerts 10055-5, 10055-6, 10055-10)
   const nonce = generateNonce();
   
-  // Apply dynamic CSP header with nonce to prevent XSS
-  // This replaces unsafe-inline and unsafe-eval with nonce-based policy
-  response.headers.set('Content-Security-Policy', buildCSPHeader(nonce));
-  
-  // Pass nonce to the application via header (can be read in layout.tsx)
-  response.headers.set('x-nonce', nonce);
+  // Apply all security headers to response
+  applySecurityHeaders(response, nonce);
 
   // Security: Handle root path redirect in middleware (ZAP Alert 10044 - Big Redirect)
   // Using 302 instead of 307 and handling in middleware prevents large redirect response bodies
@@ -75,7 +98,7 @@ export function middleware(request: NextRequest) {
     // Use 302 Found instead of 307 to avoid "Big Redirect" detection
     // Middleware redirect has minimal response body compared to page-level redirect
     const redirectResponse = NextResponse.redirect(new URL('/login', request.url), { status: 302 });
-    redirectResponse.headers.set('Content-Security-Policy', buildCSPHeader(nonce));
+    applySecurityHeaders(redirectResponse, nonce);
     return redirectResponse;
   }
 
@@ -85,7 +108,7 @@ export function middleware(request: NextRequest) {
     const cleanUrl = sanitizeRedirectUrl(url);
     cleanUrl.searchParams.delete('username'); // Also remove username from URL for security
     const redirectResponse = NextResponse.redirect(cleanUrl, { status: 302 });
-    redirectResponse.headers.set('Content-Security-Policy', buildCSPHeader(nonce));
+    applySecurityHeaders(redirectResponse, nonce);
     return redirectResponse;
   }
 
