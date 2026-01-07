@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { adminApi, exportApi, type User } from "@/lib/api";
+import { devLog, devError, devWarn } from "@/lib/logger";
 import SmartImage from "@/components/SmartImage";
 import KebabMenu, { KebabButton, type KebabMenuItem } from "@/components/ui/KebabMenu";
 import ReviewUserModal from "@/components/dashboard/ReviewUserModal";
@@ -140,28 +141,28 @@ export default function UsersPage() {
     try {
       setLoading(true);
       
-      console.log('🚀 Attempting to fetch from real API...');
+      devLog('🚀 Attempting to fetch from real API...');
       try {
         const data = await adminApi.getUsers(filters);
-        console.log('✅ Real API Success! Data:', data);
+        devLog('✅ Real API Success! Data:', data);
         
         const usersArray = data.users || data || [];
-        console.log('👤 Users count:', usersArray.length);
+        devLog('👤 Users count:', usersArray.length);
         if (usersArray.length > 0) {
-          console.log('👤 First user sample:', usersArray[0]);
-          console.log('👤 First user verified_by_admin_id:', usersArray[0]?.verified_by_admin_id);
-          console.log('👤 First user verification_reviewed_at:', usersArray[0]?.verification_reviewed_at);
+          devLog('👤 First user sample:', usersArray[0]);
+          devLog('👤 First user verified_by_admin_id:', usersArray[0]?.verified_by_admin_id);
+          devLog('👤 First user verification_reviewed_at:', usersArray[0]?.verification_reviewed_at);
         }
         
         const cleanedUsers = usersArray.map(cleanUserUrls);
         setUsers(cleanedUsers);
         return;
       } catch (apiError) {
-        console.error('❌ Real API failed:', apiError);
+        devError('❌ Real API failed:', apiError);
       }
       
       // Fallback mock data
-      console.warn('📋 Using mock data as fallback');
+      devWarn('📋 Using mock data as fallback');
       setUsers([
         {
           user_id: 1,
@@ -197,7 +198,7 @@ export default function UsersPage() {
         }
       ]);
     } catch (error) {
-      console.error("Failed to fetch users:", error);
+      devError("Failed to fetch users:", error);
       setUsers([]);
     } finally {
       setLoading(false);
@@ -222,7 +223,7 @@ export default function UsersPage() {
       setActionUser(null);
       setOpenMenuId(null);
     } catch (error) {
-      console.error(`Failed to ${decision} user:`, error);
+      devError(`Failed to ${decision} user:`, error);
       alert(error instanceof Error ? error.message : `Failed to ${decision} user`);
     }
   };
@@ -235,7 +236,7 @@ export default function UsersPage() {
       setActionUser(null);
       setOpenMenuId(null);
     } catch (error) {
-      console.error("Failed to verify user:", error);
+      devError("Failed to verify user:", error);
       alert(error instanceof Error ? error.message : 'Failed to approve user');
     }
   };
@@ -279,7 +280,7 @@ export default function UsersPage() {
       setActionUser(null);
       fetchUsers();
     } catch (error) {
-      console.error("Failed to reject user:", error);
+      devError("Failed to reject user:", error);
     }
   };
 
@@ -298,7 +299,7 @@ export default function UsersPage() {
       setActionUser(null);
       fetchUsers();
     } catch (error) {
-      console.error("Failed to deactivate user:", error);
+      devError("Failed to deactivate user:", error);
     }
   };
 
@@ -308,7 +309,7 @@ export default function UsersPage() {
       setOpenMenuId(null);
       fetchUsers();
     } catch (error) {
-      console.error("Failed to activate user:", error);
+      devError("Failed to activate user:", error);
     }
   };
 
@@ -351,7 +352,7 @@ export default function UsersPage() {
       setShowExportModal(false);
       alert('Export successful!');
     } catch (error) {
-      console.error('Export failed:', error);
+      devError('Export failed:', error);
       alert(`Export failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setExporting(false);

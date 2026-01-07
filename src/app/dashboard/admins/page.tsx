@@ -193,7 +193,7 @@ export default function AdminsPage() {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to invite admin';
       setError(errorMessage);
-      console.error('Error inviting admin:', err);
+      devError('Error inviting admin:', err);
     } finally {
       setActionLoading(false);
     }
@@ -251,7 +251,7 @@ export default function AdminsPage() {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to reset password';
       setError(errorMessage);
-      console.error('Error resetting password:', err);
+      devError('Error resetting password:', err);
     } finally {
       setActionLoading(false);
     }
@@ -281,7 +281,7 @@ export default function AdminsPage() {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to update admin status';
       setError(errorMessage);
-      console.error('Error updating admin status:', err);
+      devError('Error updating admin status:', err);
     } finally {
       setActionLoading(false);
     }

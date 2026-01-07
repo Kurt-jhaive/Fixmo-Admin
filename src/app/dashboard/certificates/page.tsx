@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { adminApi, type Certificate, exportApi, authApi } from "@/lib/api";
+import { devLog, devError } from "@/lib/logger";
 import { getImageUrl } from "@/lib/image-utils";
 import KebabMenu, { KebabButton, type KebabMenuItem } from "@/components/ui/KebabMenu";
 import type { ReasonsData } from "@/types/reasons";
@@ -147,9 +148,9 @@ export default function CertificatesPageRedesign() {
       // Add status filter - send to backend only if not 'all' or 'expiring'
       if (filter !== 'all' && filter !== 'expiring') {
         filters.certificate_status = filter;
-        console.log('📌 Adding certificate_status filter to backend request:', filter);
+        devLog('📌 Adding certificate_status filter to backend request:', filter);
       } else {
-        console.log('📌 No status filter (showing all or will filter expiring client-side)');
+        devLog('📌 No status filter (showing all or will filter expiring client-side)');
       }
       
       // Add search term
@@ -157,17 +158,17 @@ export default function CertificatesPageRedesign() {
         filters.search = searchTerm.trim();
       }
       
-      console.log('🔍 Sending to backend API - Filters:', filters);
-      console.log('🔍 Query params will be:', new URLSearchParams(filters).toString());
+      devLog('🔍 Sending to backend API - Filters:', filters);
+      devLog('🔍 Query params will be:', new URLSearchParams(filters).toString());
       
       const data = await adminApi.getCertificates(filters);
-      console.log('📊 Backend returned certificates:', {
+      devLog('📊 Backend returned certificates:', {
         count: (data.certificates || data || []).length,
         sample: (data.certificates || data || [])[0]
       });
       setCertificates(data.certificates || data || []);
     } catch (err) {
-      console.error('Error fetching certificates:', err);
+      devError('Error fetching certificates:', err);
     } finally {
       setLoading(false);
     }
@@ -202,7 +203,7 @@ export default function CertificatesPageRedesign() {
       setShowDeleteConfirm(null);
       setShowRevokeConfirm(null);
     } catch (error) {
-      console.error(`Error ${action}ing certificate:`, error);
+      devError(`Error ${action}ing certificate:`, error);
       alert(`Failed to ${action} certificate. Please try again.`);
     }
   };
@@ -266,7 +267,7 @@ export default function CertificatesPageRedesign() {
       setShowExportModal(false);
       alert('Export completed successfully!');
     } catch (error) {
-      console.error('Export error:', error);
+      devError('Export error:', error);
       alert('Failed to export certificates. Please try again.');
     } finally {
       setExporting(false);
@@ -288,7 +289,7 @@ export default function CertificatesPageRedesign() {
     return true;
   });
   
-  console.log('🎯 Certificate counts:', {
+  devLog('🎯 Certificate counts:', {
     totalFromServer: certificates.length,
     afterClientFilter: filteredCertificates.length,
     activeFilter: filter,
@@ -449,7 +450,7 @@ export default function CertificatesPageRedesign() {
             <select
               value={filter}
               onChange={(e) => {
-                console.log('🔄 Filter changed to:', e.target.value);
+                devLog('🔄 Filter changed to:', e.target.value);
                 setFilter(e.target.value);
               }}
               className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm text-gray-900 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"

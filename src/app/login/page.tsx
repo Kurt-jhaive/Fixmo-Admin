@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { authApi, type LoginRequest } from '@/lib/api';
+import { devLog } from '@/lib/logger';
 
 export default function LoginPage() {
   const [credentials, setCredentials] = useState<LoginRequest>({
@@ -16,15 +17,15 @@ export default function LoginPage() {
 
   // Check if already authenticated and token is valid
   useEffect(() => {
-    console.log('Login page: Checking auth status...');
+    devLog('Login page: Checking auth status...');
     const isValid = authApi.isValidAuth();
-    console.log('Login page: isValidAuth =', isValid);
+    devLog('Login page: isValidAuth =', isValid);
     
     if (isValid) {
-      console.log('Login page: User is authenticated, redirecting to dashboard...');
+      devLog('Login page: User is authenticated, redirecting to dashboard...');
       router.push('/dashboard');
     } else {
-      console.log('Login page: User is not authenticated, staying on login page');
+      devLog('Login page: User is not authenticated, staying on login page');
     }
   }, [router]);
 

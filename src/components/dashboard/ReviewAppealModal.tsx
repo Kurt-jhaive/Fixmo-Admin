@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { devError } from '@/lib/logger';
 
 interface ReviewAppealModalProps {
   isOpen: boolean;
@@ -90,7 +91,7 @@ export default function ReviewAppealModal({ isOpen, onClose, onSubmit, appeal }:
 
       handleClose();
     } catch (error) {
-      console.error('Error reviewing appeal:', error);
+      devError('Error reviewing appeal:', error);
     } finally {
       setIsSubmitting(false);
     }

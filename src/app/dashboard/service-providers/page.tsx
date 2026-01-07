@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { adminApi, exportApi, type ServiceProvider } from "@/lib/api";
+import { devError } from "@/lib/logger";
 import SmartImage from "@/components/SmartImage";
 import KebabMenu, { KebabButton, type KebabMenuItem } from "@/components/ui/KebabMenu";
 import ReviewProviderModal from "@/components/dashboard/ReviewProviderModal";
@@ -131,7 +132,7 @@ export default function ServiceProvidersPage() {
       const providersArray = data.providers || data || [];
       setProviders(providersArray);
     } catch (error) {
-      console.error("Failed to fetch providers:", error);
+      devError("Failed to fetch providers:", error);
     } finally {
       setLoading(false);
     }
@@ -149,7 +150,7 @@ export default function ServiceProvidersPage() {
       setActionProvider(null);
       setOpenMenuId(null);
     } catch (error) {
-      console.error("Failed to verify provider:", error);
+      devError("Failed to verify provider:", error);
       alert(error instanceof Error ? error.message : 'Failed to approve provider');
     }
   };
@@ -181,7 +182,7 @@ export default function ServiceProvidersPage() {
       fetchProviders();
       setOpenMenuId(null);
     } catch (error) {
-      console.error("Failed to activate provider:", error);
+      devError("Failed to activate provider:", error);
       alert(error instanceof Error ? error.message : 'Failed to activate provider');
     }
   };
@@ -211,7 +212,7 @@ export default function ServiceProvidersPage() {
       setCustomReason("");
       setShowCustomReason(false);
     } catch (error) {
-      console.error("Failed to reject provider:", error);
+      devError("Failed to reject provider:", error);
       alert(error instanceof Error ? error.message : 'Failed to reject provider');
     }
   };
@@ -235,7 +236,7 @@ export default function ServiceProvidersPage() {
       setCustomReason("");
       setShowCustomReason(false);
     } catch (error) {
-      console.error("Failed to deactivate provider:", error);
+      devError("Failed to deactivate provider:", error);
       alert(error instanceof Error ? error.message : 'Failed to deactivate provider');
     }
   };
@@ -273,7 +274,7 @@ export default function ServiceProvidersPage() {
       setShowExportModal(false);
       alert('Export successful!');
     } catch (error) {
-      console.error('Export failed:', error);
+      devError('Export failed:', error);
       alert(`Export failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setExporting(false);

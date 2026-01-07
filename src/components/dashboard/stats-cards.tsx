@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { adminApi, testBackendConnection, type DashboardStats } from "@/lib/api";
+import { devLog, devError } from "@/lib/logger";
 
 export function StatsCards() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -16,14 +17,14 @@ export function StatsCards() {
         setLoading(true);
         
         // First test backend connection with better error handling
-        console.log('Testing backend connection...');
+        devLog('Testing backend connection...');
         const isConnected = await testBackendConnection();
-        console.log('Backend connection result:', isConnected);
+        devLog('Backend connection result:', isConnected);
         
         setBackendStatus(isConnected ? 'connected' : 'disconnected');
         
         if (isConnected) {
-          console.log('Backend connected, fetching real data...');
+          devLog('Backend connected, fetching real data...');
           try {
             const data = await adminApi.getDashboardStats();
             // Map API response to DashboardStats interface
@@ -36,7 +37,7 @@ export function StatsCards() {
               activeDisputes: (data as Record<string, number>).activeDisputes || 0,
             });
           } catch (apiError) {
-            console.error('API call failed even though backend is connected:', apiError);
+            devError('API call failed even though backend is connected:', apiError);
             setBackendStatus('disconnected');
             // Use mock data as fallback
             setStats({
@@ -49,7 +50,7 @@ export function StatsCards() {
             });
           }
         } else {
-          console.log('Backend not connected, using mock data');
+          devLog('Backend not connected, using mock data');
           // Use mock data when backend is not available
           setStats({
             totalUsers: 156,
@@ -61,7 +62,7 @@ export function StatsCards() {
           });
         }
       } catch (error) {
-        console.error("Error in fetchStats:", error);
+        devError("Error in fetchStats:", error);
         setBackendStatus('disconnected');
         // Fallback to mock data
         setStats({

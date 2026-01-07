@@ -217,7 +217,7 @@ export default function AdjustPointsModal({ isOpen, onClose, onSubmit }: AdjustP
       // Reset form
       handleClose();
     } catch (error) {
-      console.error('Error adjusting points:', error);
+      devError('Error adjusting points:', error);
     } finally {
       setIsSubmitting(false);
     }

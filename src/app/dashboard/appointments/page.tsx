@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { appointmentsApi, exportApi, getAdminName, authApi, type BackjobApplication } from '@/lib/api';
+import { devLog, devError, devWarn } from '@/lib/logger';
 import KebabMenu, { KebabButton } from '@/components/ui/KebabMenu';
 import { useRBAC } from "@/lib/useRBAC";
 import { ViewOnlyBanner } from "@/components/ViewOnlyBanner";
@@ -166,21 +167,21 @@ import { ViewOnlyBanner } from "@/components/ViewOnlyBanner";
           params.status = statusFilter;
         }
 
-        console.log('Fetching appointments with params:', params);
+        devLog('Fetching appointments with params:', params);
         const response = await appointmentsApi.getAll(params);
-        console.log('Appointments response:', response);
+        devLog('Appointments response:', response);
         
         if (response.success) {
-          console.log('Appointments data:', response.data);
-          console.log('Appointments count:', response.data?.length);
+          devLog('Appointments data:', response.data);
+          devLog('Appointments count:', response.data?.length);
           setAppointments(response.data || []);
           setTotalPages(response.pagination?.total_pages || 1);
         } else {
-          console.warn('Response success is false');
+          devWarn('Response success is false');
           setAppointments([]);
         }
       } catch (error) {
-        console.error('Error fetching appointments:', error);
+        devError('Error fetching appointments:', error);
         setAppointments([]);
       } finally {
         setLoading(false);
@@ -190,13 +191,13 @@ import { ViewOnlyBanner } from "@/components/ViewOnlyBanner";
     const fetchDisputedBackjobs = useCallback(async () => {
       try {
         setLoading(true);
-        console.log('Fetching disputed backjobs...');
+        devLog('Fetching disputed backjobs...');
         const response = await appointmentsApi.getBackjobs({ 
           status: 'disputed',
           page: currentPage,
           limit: 20 
         });
-        console.log('Backjobs response:', response);
+        devLog('Backjobs response:', response);
         if (response.success) {
           setBackjobs(response.data || []);
           if (response.pagination) {
@@ -204,7 +205,7 @@ import { ViewOnlyBanner } from "@/components/ViewOnlyBanner";
           }
         }
       } catch (error) {
-        console.error('Error fetching backjobs:', error);
+        devError('Error fetching backjobs:', error);
         alert(`Failed to load disputed backjobs: ${error instanceof Error ? error.message : 'Unknown error'}`);
         setBackjobs([]);
       } finally {
@@ -242,7 +243,7 @@ import { ViewOnlyBanner } from "@/components/ViewOnlyBanner";
           fetchAppointments();
         }
       } catch (error) {
-        console.error('Error cancelling appointment:', error);
+        devError('Error cancelling appointment:', error);
         alert('Failed to cancel appointment');
       }
     };
@@ -281,7 +282,7 @@ import { ViewOnlyBanner } from "@/components/ViewOnlyBanner";
           exportParams.search = searchTerm;
         }
 
-        console.log('Exporting appointments with params:', exportParams);
+        devLog('Exporting appointments with params:', exportParams);
         
         // Call the export API - cast to satisfy ExportFilters interface
         const blob = await exportApi.exportAppointments(exportParams as { format: 'csv' | 'pdf' } & Record<string, string>);
@@ -299,7 +300,7 @@ import { ViewOnlyBanner } from "@/components/ViewOnlyBanner";
         setShowExportModal(false);
         alert('Export completed successfully!');
       } catch (error) {
-        console.error('Export error:', error);
+        devError('Export error:', error);
         alert('Failed to export appointments. Please try again.');
       } finally {
         setExporting(false);
@@ -354,7 +355,7 @@ import { ViewOnlyBanner } from "@/components/ViewOnlyBanner";
           fetchDisputedBackjobs();
         }
       } catch (error) {
-        console.error('Error approving dispute:', error);
+        devError('Error approving dispute:', error);
         alert(`Failed to approve dispute: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
     };
@@ -385,7 +386,7 @@ import { ViewOnlyBanner } from "@/components/ViewOnlyBanner";
           fetchDisputedBackjobs();
         }
       } catch (error) {
-        console.error('Error rejecting dispute:', error);
+        devError('Error rejecting dispute:', error);
         alert(`Failed to reject dispute: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
     };

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { testBackendConnection, adminApi } from '@/lib/api';
+import { devError } from '@/lib/logger';
 
 interface SystemMetrics {
   totalUsers: number;
@@ -56,7 +57,7 @@ export default function StatusPage() {
         ].length
       });
     } catch (error) {
-      console.error('Error loading metrics:', error);
+      devError('Error loading metrics:', error);
     } finally {
       setLoading(false);
     }

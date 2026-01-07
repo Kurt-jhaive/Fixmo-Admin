@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import { penaltyApi, type PenaltyViolation, type RestrictedAccount, type PenaltyAdjustmentLog, type PenaltyDashboardStats } from '@/lib/api';
+import { devLog, devError, devWarn } from '@/lib/logger';
 import reasonsData from '@/../REASONS.json';
 import PenaltyDashboardRedesign from '@/components/dashboard/penalty-dashboard-redesign';
 import KebabMenu, { KebabButton } from '@/components/ui/KebabMenu';
@@ -79,8 +80,8 @@ export default function PenaltiesPage() {
         setDashboardStats(response.data);
       } else if (activeTab === 'violations') {
         const response = await penaltyApi.getViolations({ limit: 100 });
-        console.log('Violations response:', response);
-        console.log('Sample violation:', response.data.violations[0]);
+        devLog('Violations response:', response);
+        devLog('Sample violation:', response.data.violations[0]);
         setViolations(response.data.violations || []);
       } else if (activeTab === 'appeals') {
         const response = await penaltyApi.getPendingAppeals();
@@ -88,7 +89,7 @@ export default function PenaltiesPage() {
       } else if (activeTab === 'logs') {
         try {
           const response = await penaltyApi.getAdjustmentLogs({ limit: 50 });
-          console.log('Adjustment logs response:', response);
+          devLog('Adjustment logs response:', response);
           
           // Handle different response structures
           if (response.success && response.data) {
@@ -97,19 +98,19 @@ export default function PenaltiesPage() {
             // In case backend returns data directly
             setAdjustmentLogs(response.data);
           } else {
-            console.warn('Unexpected response structure:', response);
+            devWarn('Unexpected response structure:', response);
             setAdjustmentLogs([]);
           }
         } catch (logError) {
           const error = logError as Error;
-          console.error('Error fetching adjustment logs:', error);
+          devError('Error fetching adjustment logs:', error);
           setError(`Unable to load adjustment logs: ${error.message || 'Unknown error'}`);
           setAdjustmentLogs([]);
         }
       }
     } catch (err) {
       const error = err as Error;
-      console.error('Error fetching data:', error);
+      devError('Error fetching data:', error);
       setError(error.message || 'Failed to load data. Please try again.');
     } finally {
       setLoading(false);
@@ -253,7 +254,7 @@ export default function PenaltiesPage() {
       setSelectedViolation(response.data);
       setShowViolationDetailsModal(true);
     } catch (err) {
-      console.error('Error fetching violation details:', err);
+      devError('Error fetching violation details:', err);
       // Fallback to showing current data if API fails
       setSelectedViolation(violation);
       setShowViolationDetailsModal(true);
@@ -726,7 +727,7 @@ export default function PenaltiesPage() {
                           : [];
                         
                         // Debug log
-                        console.log('Appeal evidence data:', {
+                        devLog('Appeal evidence data:', {
                           violation_id: appeal.violation_id,
                           evidence_urls: appeal.evidence_urls,
                           appeal_evidence: appeal.appeal_evidence,
@@ -804,10 +805,10 @@ export default function PenaltiesPage() {
                       <div className="flex justify-end">
                         <button
                           onClick={() => {
-                            console.log('Selected appeal data:', appeal);
-                            console.log('Violation name:', appeal.violation_name);
-                            console.log('Violation type:', appeal.violation_type);
-                            console.log('Violation code:', appeal.violation_code);
+                            devLog('Selected appeal data:', appeal);
+                            devLog('Violation name:', appeal.violation_name);
+                            devLog('Violation type:', appeal.violation_type);
+                            devLog('Violation code:', appeal.violation_code);
                             setSelectedAppeal(appeal);
                             setShowAppealModal(true);
                           }}
