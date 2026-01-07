@@ -79,8 +79,34 @@ export function middleware(request: NextRequest) {
   const origin = request.headers.get('origin');
   const url = new URL(request.url);
   
-  // Apply all security headers to response
+  // Check if this is a static asset request
+  const isStaticAsset = url.pathname.startsWith('/_next/static') || 
+                        url.pathname.startsWith('/_next/image') ||
+                        url.pathname.endsWith('.js') ||
+                        url.pathname.endsWith('.css') ||
+                        url.pathname.endsWith('.woff2') ||
+                        url.pathname.endsWith('.ico');
+  
+  // Apply security headers to all responses
   applySecurityHeaders(response);
+  
+  // Fix Cross-Domain Misconfiguration (ZAP Alert 10098 - Medium Risk)
+  // Explicitly set CORS headers to prevent wildcard (*) from CDN
+  // For static assets, only allow same-origin or specific trusted origins
+  if (isStaticAsset) {
+    // Remove any existing wildcard CORS header
+    response.headers.delete('Access-Control-Allow-Origin');
+    
+    // Only set CORS for trusted origins, or omit for same-origin requests
+    if (origin && allowedOrigins.includes(origin)) {
+      response.headers.set('Access-Control-Allow-Origin', origin);
+    } else {
+      // For same-origin requests (no origin header) or untrusted origins,
+      // set to the app's own domain to be explicit
+      response.headers.set('Access-Control-Allow-Origin', 'https://fixmo-admin.vercel.app');
+    }
+    response.headers.set('Access-Control-Allow-Credentials', 'false');
+  }
 
   // Security: Handle root path redirect in middleware (ZAP Alert 10044 - Big Redirect)
   // Using 302 instead of 307 and handling in middleware prevents large redirect response bodies
@@ -149,15 +175,13 @@ export function middleware(request: NextRequest) {
 }
 
 // Configure which routes the middleware runs on
+// Including static files to fix Cross-Domain Misconfiguration (ZAP Alert 10098)
 export const config = {
   matcher: [
     /*
-     * Match all request paths except:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - public folder files
+     * Match ALL request paths to apply security headers consistently
+     * This ensures CORS headers are properly set on static assets
      */
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/(.*)',
   ],
 };

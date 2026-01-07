@@ -27,6 +27,10 @@
         {
           "key": "Permissions-Policy",
           "value": "camera=(), microphone=(), geolocation=(), interest-cohort=()"
+        },
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "https://fixmo-admin.vercel.app"
         }
       ]
     },
@@ -36,6 +40,10 @@
         {
           "key": "Access-Control-Allow-Origin",
           "value": "https://fixmo-admin.vercel.app"
+        },
+        {
+          "key": "Access-Control-Allow-Credentials",
+          "value": "false"
         },
         {
           "key": "X-Content-Type-Options",
@@ -55,6 +63,10 @@
       "source": "/_next/image:path*",
       "headers": [
         {
+          "key": "Access-Control-Allow-Origin",
+          "value": "https://fixmo-admin.vercel.app"
+        },
+        {
           "key": "X-Content-Type-Options",
           "value": "nosniff"
         },
@@ -67,6 +79,10 @@
     {
       "source": "/favicon.ico",
       "headers": [
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "https://fixmo-admin.vercel.app"
+        },
         {
           "key": "X-Content-Type-Options",
           "value": "nosniff"
