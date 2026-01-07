@@ -10,6 +10,13 @@ const allowedOrigins = [
   'http://localhost:3000',
 ];
 
+// Generate a cryptographically secure nonce for CSP
+function generateNonce(): string {
+  const array = new Uint8Array(16);
+  crypto.getRandomValues(array);
+  return Buffer.from(array).toString('base64');
+}
+
 // Security utility: Strip sensitive parameters from URL for redirects (ZAP Alert 10044 - Medium Risk)
 function sanitizeRedirectUrl(url: URL): URL {
   const sensitiveParams = ['password', 'token', 'secret', 'key', 'auth', 'credential', 'session'];
@@ -24,17 +31,52 @@ function sanitizeRedirectUrl(url: URL): URL {
   return sanitizedUrl;
 }
 
+// Build CSP header with nonce for enhanced security (ZAP Alerts 10055-5, 10055-6, 10055-10)
+function buildCSPHeader(nonce: string): string {
+  const cspDirectives = [
+    "default-src 'self'",
+    // Use nonce for scripts instead of unsafe-inline/unsafe-eval (Medium Risk Fix)
+    // 'strict-dynamic' allows dynamically loaded scripts from trusted scripts with nonce
+    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'`,
+    // Style-src: nonce for inline styles (Medium Risk Fix)
+    // Note: Some Next.js features may require 'unsafe-inline' as fallback
+    `style-src 'self' 'nonce-${nonce}' 'unsafe-inline'`,
+    "img-src 'self' data: blob: https://res.cloudinary.com https://*.cloudinary.com https://fixmo-backend-production.up.railway.app",
+    "font-src 'self' data:",
+    "connect-src 'self' https://fixmo-backend-production.up.railway.app https://res.cloudinary.com",
+    "frame-ancestors 'none'",
+    "form-action 'self'",
+    "base-uri 'self'",
+    "object-src 'none'",
+    "upgrade-insecure-requests",
+  ];
+  
+  return cspDirectives.join('; ');
+}
+
 export function middleware(request: NextRequest) {
   const response = NextResponse.next();
   const origin = request.headers.get('origin');
   const url = new URL(request.url);
+
+  // Generate nonce for CSP (Medium Risk Fix - ZAP Alerts 10055-5, 10055-6, 10055-10)
+  const nonce = generateNonce();
+  
+  // Apply dynamic CSP header with nonce to prevent XSS
+  // This replaces unsafe-inline and unsafe-eval with nonce-based policy
+  response.headers.set('Content-Security-Policy', buildCSPHeader(nonce));
+  
+  // Pass nonce to the application via header (can be read in layout.tsx)
+  response.headers.set('x-nonce', nonce);
 
   // Security: Handle root path redirect in middleware (ZAP Alert 10044 - Big Redirect)
   // Using 302 instead of 307 and handling in middleware prevents large redirect response bodies
   if (url.pathname === '/') {
     // Use 302 Found instead of 307 to avoid "Big Redirect" detection
     // Middleware redirect has minimal response body compared to page-level redirect
-    return NextResponse.redirect(new URL('/login', request.url), { status: 302 });
+    const redirectResponse = NextResponse.redirect(new URL('/login', request.url), { status: 302 });
+    redirectResponse.headers.set('Content-Security-Policy', buildCSPHeader(nonce));
+    return redirectResponse;
   }
 
   // Security: Remove sensitive query parameters from login URLs (ZAP Alert 10044)
@@ -42,10 +84,13 @@ export function middleware(request: NextRequest) {
     // Redirect to clean login URL without sensitive params in URL
     const cleanUrl = sanitizeRedirectUrl(url);
     cleanUrl.searchParams.delete('username'); // Also remove username from URL for security
-    return NextResponse.redirect(cleanUrl, { status: 302 });
+    const redirectResponse = NextResponse.redirect(cleanUrl, { status: 302 });
+    redirectResponse.headers.set('Content-Security-Policy', buildCSPHeader(nonce));
+    return redirectResponse;
   }
 
-  // CORS handling - only allow specific origins
+  // CORS handling - only allow specific origins (Medium Risk Fix - ZAP Alert 10098)
+  // Remove wildcard CORS and only allow specific trusted origins
   if (origin) {
     if (allowedOrigins.includes(origin)) {
       response.headers.set('Access-Control-Allow-Origin', origin);

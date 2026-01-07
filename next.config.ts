@@ -17,11 +17,17 @@ const nextConfig: NextConfig = {
         source: '/:path*',
         headers: [
           // Content Security Policy (CSP) - Prevents XSS attacks (ZAP Alert 10038 - Medium Risk)
+          // Note: Next.js requires 'unsafe-inline' for hydration. Using strict-dynamic with nonces
+          // is handled in middleware.ts for dynamic CSP. This is a fallback policy.
+          // Removed 'unsafe-eval' - use wasm-unsafe-eval only if WebAssembly is needed
           {
             key: 'Content-Security-Policy',
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+              // Remove unsafe-eval, keep unsafe-inline as fallback (nonce applied in middleware)
+              // strict-dynamic allows scripts loaded by trusted scripts
+              "script-src 'self' 'strict-dynamic' 'wasm-unsafe-eval'",
+              // Use strict style policy - Next.js styled-jsx requires unsafe-inline but we minimize risk
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: blob: https://res.cloudinary.com https://*.cloudinary.com https://fixmo-backend-production.up.railway.app",
               "font-src 'self' data:",
@@ -31,6 +37,8 @@ const nextConfig: NextConfig = {
               "base-uri 'self'",
               "object-src 'none'",
               "upgrade-insecure-requests",
+              // Report CSP violations (optional - for monitoring)
+              "report-uri /api/csp-report",
             ].join('; '),
           },
           // Prevent clickjacking attacks - X-Frame-Options
