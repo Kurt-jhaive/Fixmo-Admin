@@ -96,6 +96,61 @@ function isApprovedProvider(provider: any): boolean {
   return false;
 }
 
+function extractViolations(payload: any): any[] {
+  if (!payload) return [];
+  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload.violations)) return payload.violations;
+  if (Array.isArray(payload.data?.violations)) return payload.data.violations;
+  if (Array.isArray(payload.data)) return payload.data;
+  return [];
+}
+
+function getViolationTimestamp(violation: any): number {
+  const value = violation?.created_at || violation?.createdAt || violation?.timestamp || violation?.updated_at;
+  const parsed = value ? Date.parse(value) : NaN;
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function summarizeViolation(violation: any) {
+  const userName = violation?.user
+    ? `${violation.user.first_name ?? ''} ${violation.user.last_name ?? ''}`.trim()
+    : null;
+  const providerName = violation?.provider
+    ? `${violation.provider.provider_first_name ?? ''} ${violation.provider.provider_last_name ?? ''}`.trim()
+    : null;
+
+  return {
+    violation_id: violation?.violation_id ?? violation?.id ?? null,
+    violation_name: violation?.violation_name ?? violation?.violation_type?.violation_name ?? null,
+    violation_code: violation?.violation_code ?? violation?.violation_type?.violation_code ?? null,
+    status: violation?.status ?? violation?.appeal_status ?? null,
+    created_at: violation?.created_at ?? violation?.createdAt ?? null,
+    user: userName || null,
+    provider: providerName || null,
+  };
+}
+
+function isLatestViolationQuery(query: string) {
+  const q = query.toLowerCase();
+  return (
+    (q.includes('latest') || q.includes('most recent') || q.includes('newest') || q.includes('recent')) &&
+    (q.includes('violation') || q.includes('appeal') || q.includes('penalty'))
+  );
+}
+
+function formatLatestViolationAnswer(summary: any) {
+  if (!summary) return null;
+
+  const parts = [
+    `The latest violation is #${summary.violation_id}`,
+    summary.violation_name ? `(${summary.violation_name})` : null,
+    summary.user ? `for ${summary.user}` : null,
+    summary.provider ? `by ${summary.provider}` : null,
+  ].filter(Boolean);
+
+  return `${parts.join(' ')}.`;
+}
+
 async function getProviderCounts(baseUrl: string, authHeader?: string) {
   const limit = 100;
   let page = 1;
@@ -130,6 +185,46 @@ async function getProviderCounts(baseUrl: string, authHeader?: string) {
     totalProviders: typeof totalFromPagination === 'number' ? totalFromPagination : totalFetched,
     approvedProviders: approvedCount,
     pagesRead,
+  };
+}
+
+async function getViolationSummary(baseUrl: string, authHeader?: string) {
+  const limit = 100;
+  let page = 1;
+  let totalFetched = 0;
+  let allViolations: any[] = [];
+  let totalFromPagination: number | null = null;
+  let pagesRead = 0;
+
+  while (page <= 50) {
+    const payload = await safeFetchJson(`${baseUrl}/api/penalty/admin/violations?limit=${limit}&offset=${(page - 1) * limit}`, authHeader);
+    if (!payload) break;
+
+    pagesRead += 1;
+    const violations = extractViolations(payload);
+    totalFetched += violations.length;
+    allViolations = allViolations.concat(violations);
+
+    const pageTotal = payload?.pagination?.total ?? payload?.pagination?.totalCount ?? null;
+    if (typeof pageTotal === 'number') {
+      totalFromPagination = pageTotal;
+    }
+
+    const totalPages = payload?.pagination?.total_pages ?? payload?.pagination?.totalPages ?? null;
+    if (typeof totalPages === 'number' && page >= totalPages) break;
+    if (violations.length < limit) break;
+    if (typeof totalFromPagination === 'number' && totalFetched >= totalFromPagination) break;
+
+    page += 1;
+  }
+
+  const sorted = allViolations.sort((a, b) => getViolationTimestamp(b) - getViolationTimestamp(a));
+  const latestViolation = sorted[0] ? summarizeViolation(sorted[0]) : null;
+
+  return {
+    totalViolations: typeof totalFromPagination === 'number' ? totalFromPagination : totalFetched,
+    pagesRead,
+    latestViolation,
   };
 }
 
@@ -170,6 +265,35 @@ async function fetchBackendData(query: string, authHeader?: string) {
         ctx.push(`[APPOINTMENTS] ${JSON.stringify(d).slice(0, 2000)}`);
       }
     }
+
+    if (q.includes('certificate') || q.includes('certificates')) {
+      const d = await safeFetchJson(`${baseUrl}/api/admin/certificates?page=1&limit=100`, authHeader);
+      if (d) {
+        ctx.push(`[CERTIFICATES] ${JSON.stringify(d).slice(0, 2000)}`);
+      }
+    }
+
+    if (q.includes('recent activity') || q.includes('activity')) {
+      const d = await safeFetchJson(`${baseUrl}/api/admin/recent-activity`, authHeader);
+      if (d) {
+        ctx.push(`[RECENT_ACTIVITY] ${JSON.stringify(d).slice(0, 2000)}`);
+      }
+    }
+
+    if (q.includes('penalty') || q.includes('violation') || q.includes('appeal')) {
+      const d = await safeFetchJson(`${baseUrl}/api/penalty/admin/dashboard`, authHeader);
+      if (d) {
+        ctx.push(`[PENALTY_DASHBOARD] ${JSON.stringify(d).slice(0, 2000)}`);
+      }
+
+      const violations = await getViolationSummary(baseUrl, authHeader);
+      ctx.push(
+        `[VIOLATION_SUMMARY] total_violations=${violations.totalViolations}, latest_violation=${JSON.stringify(
+          violations.latestViolation
+        )}`
+      );
+      debug.violationSummary = violations;
+    }
   } catch (e) {
     console.warn('fetchBackendData error', e);
   }
@@ -191,6 +315,21 @@ export async function POST(req: Request) {
 
     const backendData = await fetchBackendData(message, authHeader);
     const backendContext = backendData.context;
+
+    if (isLatestViolationQuery(message)) {
+      const latestViolation = (backendData.debug as any)?.violationSummary?.latestViolation;
+      const directAnswer = formatLatestViolationAnswer(latestViolation);
+
+      if (directAnswer) {
+        return new Response(
+          JSON.stringify({
+            response: directAnswer,
+            ...(debug ? { debug: backendData.debug, backendContextPreview: backendContext.slice(0, 1200) } : {}),
+          }),
+          { status: 200 }
+        );
+      }
+    }
 
     const history = [
       { role: 'user', parts: [{ text: GEMINI_SYSTEM_INSTRUCTIONS }] },
