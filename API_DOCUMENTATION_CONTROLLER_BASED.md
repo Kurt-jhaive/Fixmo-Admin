@@ -4,7 +4,8 @@
 
 The Fixmo Backend API is a comprehensive service management platform that connects customers with service providers. This documentation is based on the actual controller implementations and provides accurate request/response formats, validation rules, and business logic.
 
-**Base URL:** `http://localhost:3000` (or your deployed URL)
+**Base URL:** `http://localhost:3000` for dev, and for deployed
+`https://fixmo-backend-production.up.railway.app/`
 
 > **Note:** This documentation is generated from actual controller implementations to ensure accuracy.
 
