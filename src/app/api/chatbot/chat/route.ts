@@ -228,6 +228,30 @@ async function getViolationSummary(baseUrl: string, authHeader?: string) {
   };
 }
 
+async function getDashboardOverview(baseUrl: string, authHeader?: string) {
+  // Try to fetch aggregated endpoints used in client-side adminApi.getDashboardStats
+  const users = await safeFetchJson(`${baseUrl}/api/admin/users?page=1&limit=1`, authHeader);
+  const providers = await safeFetchJson(`${baseUrl}/api/admin/providers?page=1&limit=1`, authHeader);
+  const certificates = await safeFetchJson(`${baseUrl}/api/admin/certificates?page=1&limit=1`, authHeader);
+  const appointments = await safeFetchJson(`${baseUrl}/api/appointments?limit=1`, authHeader);
+
+  const totalUsers = users?.pagination?.total ?? users?.pagination?.totalCount ?? (Array.isArray(users?.users) ? users.users.length : null);
+  const totalProviders = providers?.pagination?.total ?? providers?.pagination?.totalCount ?? (Array.isArray(providers?.providers) ? providers.providers.length : null);
+  const totalCertificates = certificates?.pagination?.total ?? certificates?.pagination?.totalCount ?? (Array.isArray(certificates?.certificates) ? certificates.certificates.length : null);
+  const totalAppointments = appointments?.pagination?.total ?? appointments?.pagination?.totalCount ?? (Array.isArray(appointments?.data) ? appointments.data.length : null);
+
+  // Attempt approved providers count using our deterministic paginator
+  const providerCounts = await getProviderCounts(getBackendBaseUrl(), authHeader);
+
+  return {
+    totalUsers,
+    totalProviders: providerCounts.totalProviders ?? totalProviders,
+    approvedProviders: providerCounts.approvedProviders,
+    totalCertificates,
+    totalAppointments,
+  };
+}
+
 async function fetchBackendData(query: string, authHeader?: string) {
   const baseUrl = getBackendBaseUrl();
   const q = query.toLowerCase();
@@ -294,6 +318,14 @@ async function fetchBackendData(query: string, authHeader?: string) {
       );
       debug.violationSummary = violations;
     }
+
+    if (q.includes('dashboard') || q.includes('stats') || q.includes('overview') || q.includes('summary')) {
+      const overview = await getDashboardOverview(baseUrl, authHeader);
+      ctx.push(
+        `[DASHBOARD_OVERVIEW] users=${overview.totalUsers ?? 'unknown'}, providers=${overview.totalProviders ?? 'unknown'}, approved_providers=${overview.approvedProviders ?? 'unknown'}, certificates=${overview.totalCertificates ?? 'unknown'}, appointments=${overview.totalAppointments ?? 'unknown'}`
+      );
+      debug.dashboardOverview = overview;
+    }
   } catch (e) {
     console.warn('fetchBackendData error', e);
   }
@@ -315,6 +347,25 @@ export async function POST(req: Request) {
 
     const backendData = await fetchBackendData(message, authHeader);
     const backendContext = backendData.context;
+
+    // Direct deterministic answers for dashboard/stats queries
+    const isDashboardQuery = /dashboard|stats|overview|summary/i.test(message);
+    if (isDashboardQuery) {
+      const overview = (backendData.debug as any)?.dashboardOverview;
+      if (overview) {
+        const answer = `Here's a quick overview of your FixMo dashboard stats:
+
+Users: ${overview.totalUsers ?? 'unknown'} total.
+Service Providers: ${overview.totalProviders ?? 'unknown'} total, ${overview.approvedProviders ?? 'unknown'} verified.
+Appointments: ${overview.totalAppointments ?? 'unknown'}.
+Certificates: ${overview.totalCertificates ?? 'unknown'}.`;
+
+        return new Response(
+          JSON.stringify({ response: answer, ...(debug ? { debug: backendData.debug, backendContextPreview: backendContext.slice(0, 1200) } : {}) }),
+          { status: 200 }
+        );
+      }
+    }
 
     if (isLatestViolationQuery(message)) {
       const latestViolation = (backendData.debug as any)?.violationSummary?.latestViolation;
@@ -351,9 +402,10 @@ export async function POST(req: Request) {
     const result = await sendMessageWithRetry(chat, message, 3);
     const text = result?.response?.text ? result.response.text() : String(result);
 
+    const sanitized = typeof text === 'string' ? text.replace(/\*+/g, '') : text;
     return new Response(
       JSON.stringify({
-        response: text,
+        response: sanitized,
         ...(debug ? { debug: backendData.debug, backendContextPreview: backendContext.slice(0, 1200) } : {}),
       }),
       { status: 200 }

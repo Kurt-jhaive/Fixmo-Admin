@@ -9,6 +9,13 @@ export const GeminiChatbot = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const [isOpen, setIsOpen] = useState(false);
+  const quickMessages = [
+    'How many approved providers?',
+    'Show pending provider approvals',
+    'How many pending appeals?',
+    'Recent platform activities',
+    'Dashboard stats overview',
+  ];
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -54,13 +61,16 @@ export const GeminiChatbot = () => {
       {isOpen && (
         <div className="fixed bottom-6 right-6 w-96 max-w-[calc(100vw-24px)] h-[600px] bg-white rounded-lg shadow-2xl flex flex-col z-50 overflow-hidden">
           {/* Header */}
-          <div className="bg-gradient-to-r from-blue-500 to-blue-600 text-white p-4 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
-                <span className="text-sm font-bold">AI</span>
+          <div className="bg-gradient-to-r from-blue-600 to-sky-500 text-white p-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full flex items-center justify-center ring-1 ring-white/20 bg-white/10">
+                <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+                  <circle cx="18" cy="18" r="18" fill="#0ea5e9" />
+                  <text x="50%" y="52%" textAnchor="middle" fill="white" fontSize="12" fontWeight="700" fontFamily="Inter, Arial">FM</text>
+                </svg>
               </div>
               <div>
-                <h3 className="font-semibold">FixMo Admin Assistant</h3>
+                <h3 className="font-semibold">fixmo-AI</h3>
                 <p className="text-xs opacity-90">Powered by Gemini</p>
               </div>
             </div>
@@ -86,7 +96,7 @@ export const GeminiChatbot = () => {
           </div>
 
           {/* Messages Container */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
+          <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gradient-to-b from-white to-gray-50">
             {messages.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-center">
                 <div className="text-4xl mb-3">👋</div>
@@ -106,34 +116,73 @@ export const GeminiChatbot = () => {
                 {messages.map((message) => (
                   <div
                     key={message.id}
-                    className={`flex ${
-                      message.role === 'user'
-                        ? 'justify-end'
-                        : 'justify-start'
-                    }`}
+                    className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
                   >
-                    <div
-                      className={`max-w-xs px-4 py-2 rounded-lg ${
-                        message.role === 'user'
-                          ? 'bg-blue-500 text-white rounded-br-none'
-                          : message.error
-                          ? 'bg-red-100 text-red-800 rounded-bl-none'
-                          : 'bg-white text-gray-800 border border-gray-200 rounded-bl-none'
-                      }`}
-                    >
-                      <p className="text-sm whitespace-pre-wrap break-words">
-                        {message.content}
-                      </p>
-                      {message.loading && (
-                        <div className="flex gap-1 mt-2">
-                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" />
-                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-100" />
-                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-200" />
+                    {/* Avatar / Label */}
+                    {message.role !== 'user' && (
+                      <div className="flex-shrink-0 mr-3 mt-1">
+                        <div className="w-8 h-8 rounded-full flex items-center justify-center font-semibold text-sm ring-1 ring-sky-200 bg-sky-100">
+                          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+                            <circle cx="10" cy="10" r="10" fill="#7dd3fc" />
+                            <text x="50%" y="54%" textAnchor="middle" fill="#0369a1" fontSize="9" fontWeight="700" fontFamily="Inter, Arial">AI</text>
+                          </svg>
                         </div>
+                      </div>
+                    )}
+
+                    <div className={`max-w-[75%]`}>
+                      {message.role !== 'user' && (
+                        <div className="text-xs text-sky-500 font-medium mb-1">fixmo-AI</div>
                       )}
+
+                      <div
+                        className={`px-4 py-2 rounded-2xl text-sm whitespace-pre-wrap break-words shadow-sm ${
+                          message.role === 'user'
+                            ? 'bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-br-md rounded-tl-2xl'
+                            : message.error
+                            ? 'bg-red-50 text-red-800 border border-red-100'
+                            : 'bg-white text-gray-800 border border-gray-100'
+                        }`}
+                      >
+                        <p>{message.content}</p>
+
+                        {message.loading && (
+                          <div className="flex gap-1 mt-2">
+                            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" />
+                            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-100" />
+                            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-200" />
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ))}
+                {loading && (
+                  <div className="flex justify-start">
+                    <div className="flex-shrink-0 mr-3 mt-1">
+                      <div className="w-8 h-8 rounded-full flex items-center justify-center font-semibold text-sm ring-1 ring-sky-200 bg-sky-100">
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+                          <circle cx="10" cy="10" r="10" fill="#7dd3fc" />
+                          <text x="50%" y="54%" textAnchor="middle" fill="#0369a1" fontSize="9" fontWeight="700" fontFamily="Inter, Arial">AI</text>
+                        </svg>
+                      </div>
+                    </div>
+
+                    <div className="max-w-[75%]">
+                      <div className="text-xs text-sky-500 font-medium mb-1">fixmo-AI</div>
+                      <div className="px-4 py-3 rounded-2xl text-sm bg-white text-gray-700 border border-gray-100 shadow-sm min-w-[120px]">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-gray-500">Typing</span>
+                          <span className="flex items-center gap-1" aria-label="fixmo-AI is typing">
+                            <span className="w-2 h-2 rounded-full bg-sky-400 animate-bounce [animation-delay:-0.2s]" />
+                            <span className="w-2 h-2 rounded-full bg-sky-400 animate-bounce [animation-delay:-0.1s]" />
+                            <span className="w-2 h-2 rounded-full bg-sky-400 animate-bounce" />
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 <div ref={messagesEndRef} />
               </>
             )}
@@ -141,7 +190,24 @@ export const GeminiChatbot = () => {
 
           {/* Input Form */}
           <div className="border-t border-gray-200 p-4 bg-white">
-            <form onSubmit={handleSendMessage} className="flex gap-2">
+            {!input.trim() && (
+              <div className="mb-3 flex flex-wrap gap-2">
+                {quickMessages.slice(0, 5).map((q, i) => (
+                  <button
+                    key={i}
+                    onClick={() => {
+                      setInput(q);
+                      inputRef.current?.focus();
+                    }}
+                    className="text-xs px-3 py-1.5 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-700 shadow-sm"
+                  >
+                    {q}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <form onSubmit={handleSendMessage} className="flex gap-2 items-center">
               <input
                 ref={inputRef}
                 type="text"
@@ -156,11 +222,15 @@ export const GeminiChatbot = () => {
                 disabled={loading || !input.trim()}
                 className="bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white px-4 py-2 rounded-lg text-sm font-medium transition"
               >
-                {loading ? '...' : 'Send'}
+                Send
               </button>
             </form>
             <button
-              onClick={() => clearChat()}
+              onClick={() => {
+                clearChat();
+                setInput('');
+                inputRef.current?.focus();
+              }}
               className="text-xs text-gray-500 hover:text-gray-700 mt-2 w-full py-1"
             >
               Clear history
