@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { authApi } from '@/lib/api';
 
@@ -65,19 +65,26 @@ function buildRevenueSeries(): RevenuePoint[] {
 
 export default function RevenuePage() {
   const router = useRouter();
+  const revenueSeries = useMemo(() => buildRevenueSeries(), []);
 
   const user = authApi.getStoredUser();
-  if (!authApi.isAuthenticated() || !user) {
-    router.push('/login');
+  const isAuthenticated = authApi.isAuthenticated();
+  const isSuperAdmin = user?.role === 'super_admin';
+
+  useEffect(() => {
+    if (!isAuthenticated || !user) {
+      router.push('/login');
+      return;
+    }
+
+    if (!isSuperAdmin) {
+      router.push('/dashboard');
+    }
+  }, [isAuthenticated, isSuperAdmin, router, user]);
+
+  if (!isAuthenticated || !user || !isSuperAdmin) {
     return null;
   }
-
-  if (user.role !== 'super_admin') {
-    router.push('/dashboard');
-    return null;
-  }
-
-  const revenueSeries = useMemo(() => buildRevenueSeries(), []);
 
   const totalCommissionRevenue = revenueSeries.reduce((sum, row) => sum + row.commissionRevenue, 0);
   const averageMonthlyRevenue = Math.round(totalCommissionRevenue / revenueSeries.length);

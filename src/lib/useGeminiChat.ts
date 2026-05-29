@@ -1,7 +1,6 @@
 'use client';
 
 import { useCallback, useRef, useState } from 'react';
-import { GEMINI_SYSTEM_INSTRUCTIONS } from './gemini-system-instructions';
 
 export interface ChatMessage {
   id: string;
@@ -15,14 +14,24 @@ export interface ChatMessage {
 interface ApiCallLog {
   endpoint: string;
   method: string;
-  params?: Record<string, any>;
+  params?: Record<string, unknown>;
   timestamp: Date;
+}
+
+interface ConversationHistoryItem {
+  role: 'user' | 'model';
+  parts: Array<{ text: string }>;
+}
+
+interface ChatApiResponse {
+  response: string;
+  apiCalls?: ApiCallLog[];
 }
 
 export const useGeminiChat = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
-  const conversationHistoryRef = useRef<any[]>([]);
+  const conversationHistoryRef = useRef<ConversationHistoryItem[]>([]);
   const apiCallsRef = useRef<ApiCallLog[]>([]);
 
   /**
@@ -76,7 +85,7 @@ export const useGeminiChat = () => {
           throw new Error(errorData.error || `API error: ${response.statusText}`);
         }
 
-        const data = await response.json();
+        const data: ChatApiResponse = await response.json();
 
         // Extract API calls that Gemini made (if tracking is enabled)
         if (data.apiCalls) {

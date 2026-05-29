@@ -8,6 +8,85 @@ export const runtime = 'nodejs';
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
+type UnknownRecord = Record<string, unknown>;
+
+interface ChatSessionLike {
+  sendMessage: (message: string) => Promise<unknown>;
+}
+
+interface LatestViolationSummary {
+  violation_id: number | string | null;
+  violation_name: string | null;
+  violation_code: string | null;
+  status: string | null;
+  created_at: string | null;
+  user: string | null;
+  provider: string | null;
+}
+
+interface ProviderCounts {
+  totalProviders: number;
+  approvedProviders: number;
+  pagesRead: number;
+}
+
+interface ViolationSummary {
+  totalViolations: number;
+  pagesRead: number;
+  latestViolation: LatestViolationSummary | null;
+}
+
+interface DashboardOverview {
+  totalUsers: number | null;
+  totalProviders: number | null;
+  approvedProviders: number;
+  totalCertificates: number | null;
+  totalAppointments: number | null;
+}
+
+interface RevenueSummary {
+  from: string;
+  to: string;
+  months: number;
+  totalCommissionRevenue: number;
+  averageMonthlyRevenue: number;
+  bestRevenueMonth: RevenuePoint;
+  latestMonth: RevenuePoint;
+  sample: RevenuePoint[];
+}
+
+interface BackendDebug {
+  baseUrl: string;
+  hasAuth: boolean;
+  providerCounts?: ProviderCounts;
+  violationSummary?: ViolationSummary;
+  dashboardOverview?: DashboardOverview;
+  revenueSummary?: RevenueSummary;
+}
+
+interface ChatResponseLike {
+  response?: {
+    text?: () => string;
+  };
+}
+
+interface ChatRequestBody {
+  message: string;
+  conversationHistory?: Array<{ role: string; parts: Array<{ text: string }> }>;
+  authToken?: string;
+  debug?: boolean;
+}
+
+function toRecord(value: unknown): UnknownRecord | null {
+  return typeof value === 'object' && value !== null ? (value as UnknownRecord) : null;
+}
+
+function getNumberProp(obj: UnknownRecord | null, key: string): number | null {
+  if (!obj) return null;
+  const value = obj[key];
+  return typeof value === 'number' ? value : null;
+}
+
 // Load API reference doc (generated) so the model can consult available endpoints.
 let API_REFERENCE_CONTENT = '';
 try {
@@ -23,23 +102,24 @@ async function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function sendMessageWithRetry(chat: any, message: string, maxRetries = 3) {
-  let lastError: any = null;
+async function sendMessageWithRetry(chat: ChatSessionLike, message: string, maxRetries = 3) {
+  let lastError: unknown = null;
   let delay = 1000;
   for (let i = 0; i < maxRetries; i++) {
     try {
       const res = await chat.sendMessage(message);
       return res;
-    } catch (err: any) {
+    } catch (err: unknown) {
       lastError = err;
-      const status = err?.status || err?.code || 0;
+      const errObj = toRecord(err);
+      const status = getNumberProp(errObj, 'status') ?? getNumberProp(errObj, 'code') ?? 0;
       const retryable = status === 429 || status === 503 || status === 500;
       if (!retryable || i === maxRetries - 1) break;
       await sleep(delay);
       delay *= 2;
     }
   }
-  throw lastError;
+  throw (lastError instanceof Error ? lastError : new Error(String(lastError ?? 'Unknown error')));
 }
 
 function getBackendBaseUrl() {
@@ -76,55 +156,98 @@ async function safeFetchJson(url: string, authHeader?: string) {
   }
 }
 
-function extractProviders(payload: any): any[] {
+function extractProviders(payload: unknown): UnknownRecord[] {
   if (!payload) return [];
-  if (Array.isArray(payload)) return payload;
-  if (Array.isArray(payload.providers)) return payload.providers;
-  if (Array.isArray(payload.data)) return payload.data;
-  if (payload.data && Array.isArray(payload.data.providers)) return payload.data.providers;
+  if (Array.isArray(payload)) return payload.filter((v): v is UnknownRecord => typeof v === 'object' && v !== null);
+  const obj = toRecord(payload);
+  if (!obj) return [];
+  if (Array.isArray(obj.providers)) return obj.providers.filter((v): v is UnknownRecord => typeof v === 'object' && v !== null);
+  if (Array.isArray(obj.data)) return obj.data.filter((v): v is UnknownRecord => typeof v === 'object' && v !== null);
+  const dataObj = toRecord(obj.data);
+  if (dataObj && Array.isArray(dataObj.providers)) {
+    return dataObj.providers.filter((v): v is UnknownRecord => typeof v === 'object' && v !== null);
+  }
   return [];
 }
 
-function isApprovedProvider(provider: any): boolean {
-  if (typeof provider?.provider_isVerified === 'boolean') return provider.provider_isVerified;
-  if (typeof provider?.is_verified === 'boolean') return provider.is_verified;
-  if (typeof provider?.verified === 'boolean') return provider.verified;
-  if (typeof provider?.verification_status === 'string') {
+function isApprovedProvider(provider: UnknownRecord): boolean {
+  if (typeof provider.provider_isVerified === 'boolean') return provider.provider_isVerified;
+  if (typeof provider.is_verified === 'boolean') return provider.is_verified;
+  if (typeof provider.verified === 'boolean') return provider.verified;
+  if (typeof provider.verification_status === 'string') {
     const status = provider.verification_status.toLowerCase();
     return status === 'approved' || status === 'verified';
   }
   return false;
 }
 
-function extractViolations(payload: any): any[] {
+function extractViolations(payload: unknown): UnknownRecord[] {
   if (!payload) return [];
-  if (Array.isArray(payload)) return payload;
-  if (Array.isArray(payload.violations)) return payload.violations;
-  if (Array.isArray(payload.data?.violations)) return payload.data.violations;
-  if (Array.isArray(payload.data)) return payload.data;
+  if (Array.isArray(payload)) return payload.filter((v): v is UnknownRecord => typeof v === 'object' && v !== null);
+  const obj = toRecord(payload);
+  if (!obj) return [];
+  if (Array.isArray(obj.violations)) return obj.violations.filter((v): v is UnknownRecord => typeof v === 'object' && v !== null);
+  const dataObj = toRecord(obj.data);
+  if (dataObj && Array.isArray(dataObj.violations)) {
+    return dataObj.violations.filter((v): v is UnknownRecord => typeof v === 'object' && v !== null);
+  }
+  if (Array.isArray(obj.data)) return obj.data.filter((v): v is UnknownRecord => typeof v === 'object' && v !== null);
   return [];
 }
 
-function getViolationTimestamp(violation: any): number {
-  const value = violation?.created_at || violation?.createdAt || violation?.timestamp || violation?.updated_at;
+function getViolationTimestamp(violation: UnknownRecord): number {
+  const value =
+    (typeof violation.created_at === 'string' ? violation.created_at : null) ||
+    (typeof violation.createdAt === 'string' ? violation.createdAt : null) ||
+    (typeof violation.timestamp === 'string' ? violation.timestamp : null) ||
+    (typeof violation.updated_at === 'string' ? violation.updated_at : null);
   const parsed = value ? Date.parse(value) : NaN;
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function summarizeViolation(violation: any) {
-  const userName = violation?.user
-    ? `${violation.user.first_name ?? ''} ${violation.user.last_name ?? ''}`.trim()
+function summarizeViolation(violation: UnknownRecord): LatestViolationSummary {
+  const userObj = toRecord(violation.user);
+  const providerObj = toRecord(violation.provider);
+  const violationType = toRecord(violation.violation_type);
+
+  const userName = userObj
+    ? `${typeof userObj.first_name === 'string' ? userObj.first_name : ''} ${typeof userObj.last_name === 'string' ? userObj.last_name : ''}`.trim()
     : null;
-  const providerName = violation?.provider
-    ? `${violation.provider.provider_first_name ?? ''} ${violation.provider.provider_last_name ?? ''}`.trim()
+  const providerName = providerObj
+    ? `${typeof providerObj.provider_first_name === 'string' ? providerObj.provider_first_name : ''} ${typeof providerObj.provider_last_name === 'string' ? providerObj.provider_last_name : ''}`.trim()
     : null;
 
   return {
-    violation_id: violation?.violation_id ?? violation?.id ?? null,
-    violation_name: violation?.violation_name ?? violation?.violation_type?.violation_name ?? null,
-    violation_code: violation?.violation_code ?? violation?.violation_type?.violation_code ?? null,
-    status: violation?.status ?? violation?.appeal_status ?? null,
-    created_at: violation?.created_at ?? violation?.createdAt ?? null,
+    violation_id:
+      typeof violation.violation_id === 'number' || typeof violation.violation_id === 'string'
+        ? violation.violation_id
+        : typeof violation.id === 'number' || typeof violation.id === 'string'
+        ? violation.id
+        : null,
+    violation_name:
+      typeof violation.violation_name === 'string'
+        ? violation.violation_name
+        : typeof violationType?.violation_name === 'string'
+        ? violationType.violation_name
+        : null,
+    violation_code:
+      typeof violation.violation_code === 'string'
+        ? violation.violation_code
+        : typeof violationType?.violation_code === 'string'
+        ? violationType.violation_code
+        : null,
+    status:
+      typeof violation.status === 'string'
+        ? violation.status
+        : typeof violation.appeal_status === 'string'
+        ? violation.appeal_status
+        : null,
+    created_at:
+      typeof violation.created_at === 'string'
+        ? violation.created_at
+        : typeof violation.createdAt === 'string'
+        ? violation.createdAt
+        : null,
     user: userName || null,
     provider: providerName || null,
   };
@@ -138,7 +261,7 @@ function isLatestViolationQuery(query: string) {
   );
 }
 
-function formatLatestViolationAnswer(summary: any) {
+function formatLatestViolationAnswer(summary: LatestViolationSummary | null) {
   if (!summary) return null;
 
   const parts = [
@@ -218,7 +341,7 @@ function getRevenueSummary() {
     bestRevenueMonth,
     latestMonth,
     sample: series.slice(-6),
-  };
+  } as RevenueSummary;
 }
 
 function isRevenueQuery(query: string) {
@@ -241,7 +364,7 @@ function formatPeso(value: number) {
   }).format(value);
 }
 
-function formatRevenueAnswer(query: string, summary: any) {
+function formatRevenueAnswer(query: string, summary: RevenueSummary | undefined) {
   const q = query.toLowerCase();
   if (!summary) return null;
 
@@ -301,7 +424,7 @@ async function getViolationSummary(baseUrl: string, authHeader?: string) {
   const limit = 100;
   let page = 1;
   let totalFetched = 0;
-  let allViolations: any[] = [];
+  let allViolations: UnknownRecord[] = [];
   let totalFromPagination: number | null = null;
   let pagesRead = 0;
 
@@ -358,14 +481,14 @@ async function getDashboardOverview(baseUrl: string, authHeader?: string) {
     approvedProviders: providerCounts.approvedProviders,
     totalCertificates,
     totalAppointments,
-  };
+  } as DashboardOverview;
 }
 
 async function fetchBackendData(query: string, authHeader?: string) {
   const baseUrl = getBackendBaseUrl();
   const q = query.toLowerCase();
   const ctx: string[] = [];
-  const debug: Record<string, unknown> = {
+  const debug: BackendDebug = {
     baseUrl,
     hasAuth: Boolean(authHeader),
   };
@@ -456,7 +579,7 @@ async function fetchBackendData(query: string, authHeader?: string) {
 
 export async function POST(req: Request) {
   try {
-    const { message, conversationHistory = [], authToken, debug = false } = await req.json();
+    const { message, conversationHistory = [], authToken, debug = false } = (await req.json()) as ChatRequestBody;
     const requestAuthHeader = req.headers.get('authorization') || undefined;
     const authHeader = requestAuthHeader || (authToken ? `Bearer ${authToken}` : undefined);
 
@@ -469,7 +592,7 @@ export async function POST(req: Request) {
     // Direct deterministic answers for dashboard/stats queries
     const isDashboardQuery = /dashboard|stats|overview|summary/i.test(message);
     if (isDashboardQuery) {
-      const overview = (backendData.debug as any)?.dashboardOverview;
+      const overview = backendData.debug.dashboardOverview;
       if (overview) {
         const answer = `Here's a quick overview of your FixMo dashboard stats:
 
@@ -486,7 +609,7 @@ Certificates: ${overview.totalCertificates ?? 'unknown'}.`;
     }
 
     if (isLatestViolationQuery(message)) {
-      const latestViolation = (backendData.debug as any)?.violationSummary?.latestViolation;
+      const latestViolation = backendData.debug.violationSummary?.latestViolation ?? null;
       const directAnswer = formatLatestViolationAnswer(latestViolation);
 
       if (directAnswer) {
@@ -501,7 +624,7 @@ Certificates: ${overview.totalCertificates ?? 'unknown'}.`;
     }
 
     if (isRevenueQuery(message)) {
-      const revenueSummary = (backendData.debug as any)?.revenueSummary;
+      const revenueSummary = backendData.debug.revenueSummary;
       const directRevenueAnswer = formatRevenueAnswer(message, revenueSummary);
       if (directRevenueAnswer) {
         return new Response(
@@ -531,8 +654,9 @@ Certificates: ${overview.totalCertificates ?? 'unknown'}.`;
     }
 
     const chat = model.startChat({ history });
-    const result = await sendMessageWithRetry(chat, message, 3);
-    const text = result?.response?.text ? result.response.text() : String(result);
+    const result = await sendMessageWithRetry(chat as unknown as ChatSessionLike, message, 3);
+    const chatResult = result as ChatResponseLike;
+    const text = typeof chatResult.response?.text === 'function' ? chatResult.response.text() : String(result);
 
     const sanitized = typeof text === 'string' ? text.replace(/\*+/g, '') : text;
     return new Response(
@@ -542,9 +666,9 @@ Certificates: ${overview.totalCertificates ?? 'unknown'}.`;
       }),
       { status: 200 }
     );
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('chat route error', err);
-    const msg = err?.message || String(err) || 'Unknown error';
+    const msg = err instanceof Error ? err.message : String(err) || 'Unknown error';
     // friendly mapping
     if (msg.includes('503') || msg.includes('Service Unavailable')) {
       return new Response(JSON.stringify({ error: 'AI service busy. Try again later.' }), { status: 503 });
