@@ -15,6 +15,7 @@ You can help admins with:
 - User/Customer data inquiries (total users, verified users, pending approvals)
 - Service provider data and verification status
 - Appointment statistics and filtering
+- Revenue and commission summaries (monthly trends, averages, top month)
 - Certificate management and approvals
 - Platform activity monitoring
 - Ratings and reviews management

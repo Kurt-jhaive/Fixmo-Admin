@@ -324,6 +324,8 @@ export default function PenaltiesPage() {
   // Get unique admins for filter
   const uniqueAdmins = Array.from(new Set(adjustmentLogs.map(log => log.adjusted_by_admin?.name || log.adjusted_by_admin?.admin_name || 'System')));
 
+  const tabs: Array<'dashboard' | 'violations' | 'appeals' | 'logs'> = ['dashboard', 'violations', 'appeals', 'logs'];
+
   return (
     <div className="p-6">
       <ViewOnlyBanner module="penalties" />
@@ -351,10 +353,10 @@ export default function PenaltiesPage() {
       {/* Tabs */}
       <div className="mb-6 border-b border-gray-200">
         <nav className="-mb-px flex space-x-8">
-          {['dashboard', 'violations', 'appeals', 'logs'].map((tab) => (
+          {tabs.map((tab) => (
             <button
               key={tab}
-              onClick={() => setActiveTab(tab as 'dashboard' | 'violations' | 'appeals' | 'logs')}
+              onClick={() => setActiveTab(tab)}
               className={`py-4 px-1 border-b-2 font-medium text-sm capitalize transition-all duration-200 ${
                 activeTab === tab
                   ? 'border-blue-500 text-blue-600 transform scale-105'

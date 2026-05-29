@@ -33,6 +33,12 @@ const menuItems = [
     roles: ["operations", "super_admin"], // Only Operations and Super Admin
   },
   {
+    href: "/dashboard/revenue",
+    label: "Revenue Checker",
+    icon: "💰",
+    roles: ["super_admin"],
+  },
+  {
     href: "/dashboard/certificates",
     label: "Certificates",
     icon: "📜",
